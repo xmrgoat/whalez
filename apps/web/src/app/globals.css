@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #F3F3F3;
+  --foreground: #000000;
+  --muted: #f0f0f0;
+  --muted-foreground: #737373;
+  --border: #e0e0e0;
+  --card: #F3F3F3;
+  --accent: #171717;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+/* Pixel font for headings */
+.font-pixel {
+  font-family: var(--font-pixel), 'Press Start 2P', cursive;
+}
+
+/* Monospace for body */
+.font-mono {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Card styles */
+.card {
+  @apply bg-card border border-border rounded-lg p-4;
+}
+
+/* Button styles */
+.btn {
+  @apply px-4 py-2 rounded border border-border bg-white hover:bg-muted transition-colors;
+}
+
+.btn-primary {
+  @apply bg-black text-white border-black hover:bg-accent;
+}
+
+/* Input styles */
+.input {
+  @apply w-full px-3 py-2 border border-border rounded bg-white focus:outline-none focus:ring-1 focus:ring-black;
+}
+
+/* Table styles */
+.table {
+  @apply w-full border-collapse;
+}
+
+.table th,
+.table td {
+  @apply px-4 py-2 text-left border-b border-border;
+}
+
+.table th {
+  @apply font-semibold bg-muted;
+}
+
+.table tr:hover {
+  @apply bg-muted;
+}
+
+/* Spline viewer sizing */
+spline-viewer {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

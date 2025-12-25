@@ -1,0 +1,32 @@
+{
+  "name": "whalez",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Whalez - Autonomous Trading Agent with Web Dashboard",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:web": "pnpm --filter @whalez/web dev",
+    "dev:api": "pnpm --filter @whalez/api dev",
+    "dev:worker": "pnpm --filter @whalez/worker dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @whalez/database generate",
+    "db:migrate": "pnpm --filter @whalez/database migrate",
+    "db:push": "pnpm --filter @whalez/database push",
+    "db:studio": "pnpm --filter @whalez/database studio",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "e2e:smoke": "npx tsx scripts/e2e-smoke.ts",
+    "test:hl": "npx tsx scripts/test-hl-stream.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "prettier": "^3.1.0",
+    "eslint": "^8.55.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

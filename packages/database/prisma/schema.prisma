@@ -1,0 +1,326 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ Users & Authentication ============
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apiKeys ApiKey[]
+  bots    Bot[]
+
+  @@index([email])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  keyHash   String   @unique
+  scopes    String[] // ['read', 'trade', 'manage']
+  lastUsed  DateTime?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([userId])
+}
+
+// ============ Bots & Configuration ============
+
+model Bot {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  symbol      String
+  config      Json      // BotConfig JSON
+  status      BotStatus @default(STOPPED)
+  paperTrading Boolean  @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs           BotRun[]
+  trades         Trade[]
+  signals        Signal[]
+  critiqueReports CritiqueReport[]
+  paramChanges   ParamChange[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum BotStatus {
+  RUNNING
+  STOPPED
+  PAUSED
+  ERROR
+}
+
+model BotRun {
+  id        String    @id @default(cuid())
+  botId     String
+  startedAt DateTime  @default(now())
+  stoppedAt DateTime?
+  reason    String?
+  metrics   Json?     // Performance metrics at end of run
+
+  bot    Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  trades Trade[]
+
+  @@index([botId])
+  @@index([startedAt])
+}
+
+// ============ Trading ============
+
+model Trade {
+  id           String      @id @default(cuid())
+  botId        String
+  botRunId     String?
+  symbol       String
+  side         TradeSide
+  entryPrice   Float
+  exitPrice    Float?
+  quantity     Float
+  entryTime    DateTime
+  exitTime     DateTime?
+  pnl          Float?
+  pnlPercent   Float?
+  fees         Float       @default(0)
+  status       TradeStatus @default(OPEN)
+  signalId     String?
+  orderId      String?
+  exitOrderId  String?
+  stopLoss     Float?
+  takeProfit   Float?
+  notes        String?
+  metadata     Json?
+
+  bot    Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  botRun BotRun? @relation(fields: [botRunId], references: [id])
+  signal Signal? @relation(fields: [signalId], references: [id])
+
+  @@index([botId])
+  @@index([status])
+  @@index([entryTime])
+  @@index([symbol])
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  OPEN
+  CLOSED
+}
+
+model Signal {
+  id         String       @id @default(cuid())
+  botId      String
+  symbol     String
+  timeframe  String
+  action     SignalAction
+  confidence Float
+  price      Float
+  indicators Json         // Record<string, number>
+  reasons    String[]
+  createdAt  DateTime     @default(now())
+
+  bot    Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  trades Trade[]
+
+  @@index([botId])
+  @@index([createdAt])
+}
+
+enum SignalAction {
+  LONG
+  SHORT
+  CLOSE_LONG
+  CLOSE_SHORT
+  HOLD
+}
+
+// ============ Self-Critique System ============
+
+model CritiqueReport {
+  id              String   @id @default(cuid())
+  botId           String
+  tradeIds        String[]
+  metrics         Json     // CritiqueMetrics
+  whatWorked      String[]
+  whatDidntWork   String[]
+  failurePatterns String[]
+  recommendations Json     // ParameterChange[]
+  appliedChanges  Json     // ParameterChange[]
+  createdAt       DateTime @default(now())
+
+  bot          Bot           @relation(fields: [botId], references: [id], onDelete: Cascade)
+  paramChanges ParamChange[]
+
+  @@index([botId])
+  @@index([createdAt])
+}
+
+model ParamChange {
+  id              String   @id @default(cuid())
+  botId           String
+  critiqueReportId String?
+  parameter       String
+  previousValue   Json
+  newValue        Json
+  reason          String
+  applied         Boolean  @default(false)
+  rolledBack      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  bot            Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  critiqueReport CritiqueReport? @relation(fields: [critiqueReportId], references: [id])
+
+  @@index([botId])
+  @@index([createdAt])
+}
+
+// ============ Decision Records (V3) ============
+
+model Decision {
+  id              String   @id @default(cuid())
+  userId          String?
+  botId           String?
+  symbol          String
+  timeframe       String
+  timestamp       DateTime // Candle timestamp this decision relates to
+  action          DecisionAction
+  confidenceScore Int      // 0-100 computed score
+  blockedReason   String?  // If blocked, why
+  executed        Boolean  @default(false)
+  tradeId         String?  // Link to Trade if executed
+  critiqueId      String?  // Link to CritiqueReport if reviewed
+  createdAt       DateTime @default(now())
+
+  breakdown DecisionBreakdown?
+  evidence  DecisionEvidence[]
+  markers   ChartMarker[]
+
+  @@index([botId])
+  @@index([symbol, timeframe])
+  @@index([timestamp])
+  @@index([createdAt])
+  @@index([action])
+}
+
+enum DecisionAction {
+  LONG
+  SHORT
+  CLOSE_LONG
+  CLOSE_SHORT
+  HOLD
+  NO_TRADE
+}
+
+model DecisionBreakdown {
+  id             String @id @default(cuid())
+  decisionId     String @unique
+  dataQuality    Int    // 0-20
+  signalAgreement Int   // 0-30
+  riskFit        Int    // 0-25
+  regimeMatch    Int    // 0-15
+  newsBonus      Int    // 0-10
+
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+}
+
+model DecisionEvidence {
+  id         String         @id @default(cuid())
+  decisionId String
+  type       EvidenceType
+  label      String         // e.g. "EMA20 > EMA50", "RSI < 30"
+  value      String         // The actual value
+  status     EvidenceStatus
+  weight     Int            // Contribution to score
+  sourceUrl  String?        // For Grok sources
+
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+}
+
+enum EvidenceType {
+  INDICATOR
+  GROK
+  RISK
+  DATA
+  REGIME
+}
+
+enum EvidenceStatus {
+  PASS
+  FAIL
+  UNKNOWN
+}
+
+// ============ Chart Markers (V3) ============
+
+model ChartMarker {
+  id         String      @id @default(cuid())
+  decisionId String?
+  botId      String?
+  symbol     String
+  timeframe  String
+  timestamp  DateTime
+  kind       MarkerKind
+  price      Float
+  side       String?     // LONG, SHORT
+  label      String?
+  meta       Json?
+  createdAt  DateTime    @default(now())
+
+  decision Decision? @relation(fields: [decisionId], references: [id], onDelete: SetNull)
+
+  @@index([symbol, timeframe, timestamp])
+  @@index([decisionId])
+}
+
+enum MarkerKind {
+  ENTRY
+  EXIT
+  STOP_LOSS
+  TAKE_PROFIT
+  NO_TRADE
+  NOTE
+}
+
+// ============ Market Data Snapshots (Optional) ============
+
+model MarketSnapshot {
+  id        String   @id @default(cuid())
+  symbol    String
+  timeframe String
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+
+  @@unique([symbol, timeframe, timestamp])
+  @@index([symbol, timeframe])
+  @@index([timestamp])
+}
