@@ -137,8 +137,8 @@ export default function BacktestPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />
       </div>
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
@@ -148,7 +148,7 @@ export default function BacktestPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
                   <BarChart3 className="w-6 h-6 text-white" />
                 </div>
                 Quantitative Backtester
@@ -167,12 +167,12 @@ export default function BacktestPage() {
                 </select>
                 <div className="grid grid-cols-3 gap-1">
                   {(['1h', '4h', '1d'] as const).map(tf => (
-                    <button key={tf} onClick={() => setConfig(c => ({ ...c, interval: tf }))} className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${config.interval === tf ? 'bg-indigo-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>{tf}</button>
+                    <button key={tf} onClick={() => setConfig(c => ({ ...c, interval: tf }))} className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${config.interval === tf ? 'bg-emerald-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>{tf}</button>
                   ))}
                 </div>
                 <div className="grid grid-cols-5 gap-1">
                   {[7, 14, 30, 60, 90].map(d => (
-                    <button key={d} onClick={() => setConfig(c => ({ ...c, days: d }))} className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${config.days === d ? 'bg-cyan-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>{d}d</button>
+                    <button key={d} onClick={() => setConfig(c => ({ ...c, days: d }))} className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${config.days === d ? 'bg-teal-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>{d}d</button>
                   ))}
                 </div>
                 {config.days < 10 && (config.strategy === 'improved_bot' || config.strategy === 'bot_strategy') && (
@@ -188,8 +188,8 @@ export default function BacktestPage() {
               {selectedStrategy && <p className="mt-2 text-xs text-white/40">{selectedStrategy.description}</p>}
             </div>
             {/* Trading Mode */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
-              <h3 className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2"><Target className="w-4 h-4 text-indigo-400" />Trading Mode</h3>
+            <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/20">
+              <h3 className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2"><Target className="w-4 h-4 text-emerald-400" />Trading Mode</h3>
               <div className="grid grid-cols-3 gap-2">
                 {(['conservative', 'moderate', 'aggressive'] as const).map(mode => (
                   <button key={mode} onClick={() => applyTradingMode(mode)} className={`py-2 px-2 rounded-lg text-xs font-medium transition-all ${config.tradingMode === mode 
@@ -255,7 +255,7 @@ export default function BacktestPage() {
                 </div>
               )}
             </div>
-            <button onClick={runBacktest} disabled={isLoading} className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${isLoading ? 'bg-white/10 text-white/50 cursor-wait' : 'bg-gradient-to-r from-indigo-500 to-cyan-500 text-white hover:opacity-90'}`}>
+            <button onClick={runBacktest} disabled={isLoading} className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all shadow-lg ${isLoading ? 'bg-white/10 text-white/50 cursor-wait' : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:opacity-90 shadow-emerald-500/20'}`}>
               {isLoading ? (<><RefreshCw className="w-5 h-5 animate-spin" />Fetching real data...</>) : (<><Play className="w-5 h-5" />Run Backtest</>)}
             </button>
             {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
@@ -276,7 +276,7 @@ export default function BacktestPage() {
             {isLoading && (
               <div className="h-full flex items-center justify-center">
                 <div className="text-center">
-                  <RefreshCw className="w-12 h-12 mx-auto mb-4 text-indigo-400 animate-spin" />
+                  <RefreshCw className="w-12 h-12 mx-auto mb-4 text-emerald-400 animate-spin" />
                   <p className="text-white/70 mb-2">Fetching real K-Line data from Hyperliquid...</p>
                   <p className="text-white/40 text-sm">api.hyperliquid.xyz/info - candleSnapshot</p>
                 </div>
@@ -287,11 +287,11 @@ export default function BacktestPage() {
                 <DataSourceBanner dataInfo={result.dataInfo} />
                 <div className="flex gap-2">
                   {(['overview', 'chart', 'trades', 'analysis', 'history'] as const).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === tab ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white/70'}`}>
+                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === tab ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-white/50 hover:text-white/70 border border-transparent'}`}>
                       {tab === 'chart' && <CandlestickChart className="w-4 h-4" />}
                       {tab === 'history' && <History className="w-4 h-4" />}
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                      {tab === 'history' && history.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-indigo-500/30 rounded-full">{history.length}</span>}
+                      {tab === 'history' && history.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-emerald-500/30 text-emerald-400 rounded-full">{history.length}</span>}
                     </button>
                   ))}
                 </div>
@@ -612,7 +612,7 @@ function OverviewTab({ result, config }: { result: BacktestResult; config: any }
         <MetricCard icon={<Activity className="w-4 h-4" />} label="Sharpe Ratio" value={m.sharpeRatio.toFixed(2)} subValue={m.sharpeRatio >= 2 ? 'Excellent' : m.sharpeRatio >= 1 ? 'Good' : 'Poor'} color={m.sharpeRatio >= 1.5 ? 'emerald' : m.sharpeRatio >= 1 ? 'amber' : 'red'} />
       </div>
       <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-        <h3 className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2"><LineChart className="w-4 h-4 text-indigo-400" />Equity Curve</h3>
+        <h3 className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2"><LineChart className="w-4 h-4 text-emerald-400" />Equity Curve</h3>
         <EquityCurveChart data={result.equityCurve} initialCapital={config.initialCapital} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -642,9 +642,9 @@ function OverviewTab({ result, config }: { result: BacktestResult; config: any }
         </div>
       </div>
       {/* Advanced Quant Metrics */}
-      <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 border border-indigo-500/20">
+      <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/20">
         <h3 className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2">
-          <Zap className="w-4 h-4 text-indigo-400" />
+          <Zap className="w-4 h-4 text-emerald-400" />
           Advanced Quantitative Metrics
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -802,7 +802,7 @@ function AnalysisTab({ result }: { result: BacktestResult }) {
   return (
     <div className="space-y-4">
       <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-        <h3 className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2"><BarChart2 className="w-4 h-4 text-indigo-400" />Return Distribution</h3>
+        <h3 className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2"><BarChart2 className="w-4 h-4 text-emerald-400" />Return Distribution</h3>
         <ReturnDistributionChart data={result.returnDistribution} />
       </div>
       <div className="p-4 rounded-xl bg-white/5 border border-white/10">
@@ -867,7 +867,7 @@ function HistoryTab({ history, loading, onDelete, onRefresh }: { history: Histor
   if (loading) {
     return (
       <div className="p-8 text-center">
-        <RefreshCw className="w-8 h-8 mx-auto mb-3 text-indigo-400 animate-spin" />
+        <RefreshCw className="w-8 h-8 mx-auto mb-3 text-emerald-400 animate-spin" />
         <p className="text-white/50">Loading history...</p>
       </div>
     );
@@ -887,7 +887,7 @@ function HistoryTab({ history, loading, onDelete, onRefresh }: { history: Histor
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-white/70 flex items-center gap-2">
-          <Database className="w-4 h-4 text-indigo-400" />
+          <Database className="w-4 h-4 text-emerald-400" />
           Backtest History ({history.length} results)
         </h3>
         <button onClick={onRefresh} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
@@ -918,7 +918,7 @@ function HistoryTab({ history, loading, onDelete, onRefresh }: { history: Histor
                     <div className="text-white/40">{new Date(item.createdAt).toLocaleTimeString()}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-1 rounded bg-indigo-500/20 text-indigo-400 text-xs">{item.config.strategy}</span>
+                    <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs">{item.config.strategy}</span>
                   </td>
                   <td className="px-4 py-3 text-white font-mono">{item.config.symbol}</td>
                   <td className={`px-4 py-3 font-mono font-medium ${item.metrics.totalReturnPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -965,7 +965,7 @@ function HistoryTab({ history, loading, onDelete, onRefresh }: { history: Histor
         </div>
         <div className="p-3 rounded-lg bg-white/5 border border-white/10">
           <div className="text-xs text-white/40">Best Strategy</div>
-          <div className="text-sm font-medium text-indigo-400 truncate">
+          <div className="text-sm font-medium text-emerald-400 truncate">
             {history.length > 0 ? history.reduce((best, h) => h.metrics.totalReturnPct > best.metrics.totalReturnPct ? h : best).config.strategy : '-'}
           </div>
         </div>

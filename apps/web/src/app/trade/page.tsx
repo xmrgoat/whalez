@@ -35,7 +35,9 @@ import {
   BarChart2,
   Shield,
   X,
-  Trophy
+  Trophy,
+  Bot,
+  Library
 } from 'lucide-react';
 
 const TradingChartPro = dynamic(() => import('@/components/TradingChartPro'), { ssr: false });
@@ -61,22 +63,22 @@ const TIMEFRAME_GROUPS = {
   DAYS: ['1d', '3d', '1w', '1M'],
 };
 
-// Timeframe display labels
+// Timeframe display labels (English for consistency)
 const TIMEFRAME_LABELS: Record<string, string> = {
   '1m': '1 minute',
   '3m': '3 minutes',
   '5m': '5 minutes',
   '15m': '15 minutes',
   '30m': '30 minutes',
-  '1h': '1 heure',
-  '2h': '2 heures',
-  '4h': '4 heures',
-  '8h': '8 heures',
-  '12h': '12 heures',
-  '1d': '1 jour',
-  '3d': '3 jours',
-  '1w': '1 semaine',
-  '1M': '1 mois',
+  '1h': '1 hour',
+  '2h': '2 hours',
+  '4h': '4 hours',
+  '8h': '8 hours',
+  '12h': '12 hours',
+  '1d': '1 day',
+  '3d': '3 days',
+  '1w': '1 week',
+  '1M': '1 month',
 };
 
 // Timeframe to milliseconds
@@ -720,14 +722,30 @@ export default function TradePage() {
           </div>
         )}
 
-        {/* Leaderboard Link */}
-        <button
-          onClick={() => router.push('/leaderboard')}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 text-amber-400 hover:from-amber-500/20 hover:to-orange-500/20 transition-all duration-200 text-sm"
-        >
-          <Trophy className="w-4 h-4" />
-          <span className="hidden sm:inline font-medium">Leaderboard</span>
-        </button>
+        {/* Navigation Links */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => router.push('/bots')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 text-indigo-400 hover:from-indigo-500/20 hover:to-purple-500/20 transition-all duration-200 text-sm"
+          >
+            <Bot className="w-4 h-4" />
+            <span className="hidden sm:inline font-medium">My Bots</span>
+          </button>
+          <button
+            onClick={() => router.push('/library')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 text-emerald-400 hover:from-emerald-500/20 hover:to-teal-500/20 transition-all duration-200 text-sm"
+          >
+            <Library className="w-4 h-4" />
+            <span className="hidden sm:inline font-medium">Library</span>
+          </button>
+          <button
+            onClick={() => router.push('/leaderboard')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 text-amber-400 hover:from-amber-500/20 hover:to-orange-500/20 transition-all duration-200 text-sm"
+          >
+            <Trophy className="w-4 h-4" />
+            <span className="hidden sm:inline font-medium">Leaderboard</span>
+          </button>
+        </div>
 
         {/* Bot Controls in Header */}
         <div className="flex items-center gap-2 ml-auto">

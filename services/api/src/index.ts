@@ -24,6 +24,9 @@ import { statsRoutes } from './routes/stats.js';
 import { accountRoutes } from './routes/account.js';
 import { backtestRoutes } from './routes/backtest.js';
 import { grokRoutes } from './routes/grok.js';
+import { userBotsRoutes } from './routes/user-bots.js';
+import { libraryRoutes } from './routes/library.js';
+import { botControlRoutes } from './routes/bot-control.js';
 
 const PORT = Number(process.env['API_PORT']) || 3001;
 const HOST = process.env['API_HOST'] || '0.0.0.0';
@@ -90,6 +93,9 @@ async function main() {
   await fastify.register(wsRoutes, { prefix: '/ws' });
   await fastify.register(backtestRoutes, { prefix: '/api/backtest' });
   await fastify.register(grokRoutes, { prefix: '/api/grok' });
+  await fastify.register(userBotsRoutes, { prefix: '/api/user-bots' });
+  await fastify.register(libraryRoutes, { prefix: '/api/library' });
+  await fastify.register(botControlRoutes, { prefix: '/api/control' });
 
   // Start server
   try {

@@ -1,13 +1,7 @@
 'use client';
 
 /**
- * Profile Page
- * 
- * Complete user profile with:
- * - Account info and wallet
- * - Trading statistics
- * - Performance history
- * - Settings and preferences
+ * Profile Page - Modern & Clean Design
  */
 
 import { useState, useEffect } from 'react';
@@ -19,25 +13,14 @@ import {
   Wallet,
   TrendingUp,
   TrendingDown,
-  BarChart2,
-  Settings,
-  Shield,
-  Clock,
-  Calendar,
-  Award,
-  Target,
-  Activity,
-  DollarSign,
-  Percent,
   ArrowLeft,
   Copy,
   Check,
   ExternalLink,
-  ChevronRight,
-  Bell,
-  Moon,
-  Sun,
-  LogOut
+  LogOut,
+  Loader2,
+  Clock,
+  Settings,
 } from 'lucide-react';
 
 const PnlChart = dynamic(() => import('@/components/PnlChart'), { ssr: false });
@@ -50,22 +33,15 @@ interface UserStats {
   winRate: number;
   profitFactor: number;
   maxDrawdown: number;
-  bestMonth: { month: string; pnl: number };
-  worstMonth: { month: string; pnl: number };
-  avgTradesPerDay: number;
   totalVolume: number;
-  accountAge: number;
 }
 
 interface TradeHistory {
   id: string;
   symbol: string;
   side: 'long' | 'short';
-  entryPrice: number;
-  exitPrice: number;
   pnl: number;
   pnlPercent: number;
-  entryTime: string;
   exitTime: string;
 }
 
@@ -73,31 +49,23 @@ export default function ProfilePage() {
   const router = useRouter();
   const { wallet, disconnect } = useWallet();
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
   const [stats, setStats] = useState<UserStats | null>(null);
   const [trades, setTrades] = useState<TradeHistory[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Preferences
-  const [darkMode, setDarkMode] = useState(true);
-  const [notifications, setNotifications] = useState(true);
-  const [soundAlerts, setSoundAlerts] = useState(false);
 
   useEffect(() => {
     if (!wallet.isConnected) {
       router.push('/');
       return;
     }
-
     fetchUserData();
   }, [wallet.isConnected, router]);
 
   const fetchUserData = async () => {
     try {
       setLoading(true);
-
       if (wallet.address) {
-        // Fetch performance data from trading endpoint
         const perfRes = await fetch(`${API_URL}/trading/performance?wallet=${wallet.address}`);
         if (perfRes.ok) {
           const perf = await perfRes.json();
@@ -108,15 +76,10 @@ export default function ProfilePage() {
             winRate: summary.winRate || 0,
             profitFactor: summary.profitFactor || 0,
             maxDrawdown: summary.maxDrawdownPct || 0,
-            bestMonth: summary.bestMonth || { month: 'N/A', pnl: 0 },
-            worstMonth: summary.worstMonth || { month: 'N/A', pnl: 0 },
-            avgTradesPerDay: summary.avgTradesPerDay || 0,
             totalVolume: summary.totalVolume || 0,
-            accountAge: 0,
           });
         }
 
-        // Fetch trade history from trading endpoint
         const tradesRes = await fetch(`${API_URL}/trading/trade-history?wallet=${wallet.address}&limit=20`);
         if (tradesRes.ok) {
           const data = await tradesRes.json();
@@ -124,30 +87,15 @@ export default function ProfilePage() {
             id: t.id,
             symbol: t.symbol,
             side: t.side === 'buy' ? 'long' : 'short',
-            entryPrice: t.price,
-            exitPrice: t.exitPrice || t.price,
             pnl: t.pnlWithFees || t.pnl || 0,
             pnlPercent: t.price > 0 ? ((t.pnlWithFees || t.pnl || 0) / (t.price * t.quantity)) * 100 : 0,
-            entryTime: new Date(t.timestamp).toISOString(),
             exitTime: t.exitTime ? new Date(t.exitTime).toISOString() : new Date(t.timestamp).toISOString(),
           })));
         }
       }
     } catch (err) {
       console.error('Failed to fetch user data:', err);
-      // Set default stats on error
-      setStats({
-        totalPnl: 0,
-        totalTrades: 0,
-        winRate: 0,
-        profitFactor: 0,
-        maxDrawdown: 0,
-        bestMonth: { month: 'N/A', pnl: 0 },
-        worstMonth: { month: 'N/A', pnl: 0 },
-        avgTradesPerDay: 0,
-        totalVolume: 0,
-        accountAge: 0,
-      });
+      setStats({ totalPnl: 0, totalTrades: 0, winRate: 0, profitFactor: 0, maxDrawdown: 0, totalVolume: 0 });
     } finally {
       setLoading(false);
     }
@@ -161,353 +109,205 @@ export default function ProfilePage() {
     }
   };
 
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
+  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  
   const formatPnl = (value: number) => {
-    const formatted = Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2 });
-    return value >= 0 ? `+$${formatted}` : `-$${formatted}`;
+    const abs = Math.abs(value);
+    if (abs >= 1000) return `${value >= 0 ? '+' : '-'}$${(abs / 1000).toFixed(1)}K`;
+    return `${value >= 0 ? '+' : '-'}$${abs.toFixed(2)}`;
   };
 
-  if (!wallet.isConnected) {
-    return null;
-  }
+  if (!wallet.isConnected) return null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] relative">
-      {/* Background Effects */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px]" />
-      </div>
-
+    <div className="min-h-screen bg-[#09090b]">
       {/* Header */}
-      <header className="border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur-xl sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <button
-            onClick={() => router.push('/trade')}
-            className="flex items-center gap-2 text-white/50 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back to Trading</span>
-          </button>
-          
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-white" />
+      <header className="border-b border-white/[0.06] bg-[#09090b]/90 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="h-14 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => router.push('/')} 
+                className="p-1.5 -ml-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white/80 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-emerald-400" />
+                <h1 className="text-[15px] font-medium text-white/90">Profile</h1>
+              </div>
             </div>
-            <h1 className="font-display font-bold text-white">Profile</h1>
+            
+            <button
+              onClick={() => { disconnect(); router.push('/'); }}
+              className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-xs font-medium text-red-400 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Disconnect
+            </button>
           </div>
-          
-          <button
-            onClick={() => { disconnect(); router.push('/'); }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors text-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            Disconnect
-          </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 relative z-10">
-        {/* Profile Header */}
-        <div className="rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 p-6 mb-6 backdrop-blur-sm">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <User className="w-8 h-8 text-white" />
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        {/* Profile Card */}
+        <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-5 mb-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center">
+              <User className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium text-white/90">Trader</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               </div>
-              <div>
-                <h2 className="font-display font-bold text-xl text-white">Trader</h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/5 border border-white/10">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="font-mono text-xs text-white/60">
-                      {wallet.address ? formatAddress(wallet.address) : 'Not connected'}
-                    </span>
-                    <button onClick={copyAddress} className="p-0.5 rounded hover:bg-white/10">
-                      {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-white/40" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 mt-3">
-                  <span className="text-xs text-white/40 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    Member since Dec 2024
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.04]">
+                  <Wallet className="w-3 h-3 text-white/40" />
+                  <span className="font-mono text-xs text-white/50">
+                    {wallet.address ? formatAddress(wallet.address) : '...'}
                   </span>
-                  <span className="text-xs text-white/40 flex items-center gap-1">
-                    <Activity className="w-3 h-3" />
-                    {stats?.totalTrades || 0} trades
-                  </span>
+                  <button onClick={copyAddress} className="p-0.5 rounded hover:bg-white/10">
+                    {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-white/30" />}
+                  </button>
                 </div>
+                <a 
+                  href={`https://app.hyperliquid.xyz/explorer/address/${wallet.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white/60"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
             </div>
+          </div>
 
-            {/* Quick Stats */}
-            <div className="flex gap-4">
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center min-w-[100px]">
-                <div className="text-xs text-white/40 mb-1">Total PnL</div>
-                <div className={`font-mono font-bold text-xl ${(stats?.totalPnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {formatPnl(stats?.totalPnl || 0)}
-                </div>
-              </div>
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center min-w-[100px]">
-                <div className="text-xs text-white/40 mb-1">Win Rate</div>
-                <div className={`font-mono font-bold text-xl ${(stats?.winRate || 0) >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {stats?.winRate?.toFixed(1) || '0.0'}%
-                </div>
-              </div>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-4 gap-4">
+            <div>
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">PnL</p>
+              <p className={`text-lg font-semibold ${(stats?.totalPnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {formatPnl(stats?.totalPnl || 0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Win Rate</p>
+              <p className={`text-lg font-semibold ${(stats?.winRate || 0) >= 50 ? 'text-emerald-400' : 'text-white/70'}`}>
+                {stats?.winRate?.toFixed(0) || '0'}%
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Trades</p>
+              <p className="text-lg font-semibold text-white/80">{stats?.totalTrades || 0}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Volume</p>
+              <p className="text-lg font-semibold text-white/80">
+                ${((stats?.totalVolume || 0) / 1000).toFixed(0)}K
+              </p>
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">
-          {(['overview', 'history', 'settings'] as const).map(tab => (
+        <div className="flex gap-1 p-1 rounded-lg bg-white/[0.03] w-fit mb-6">
+          {[
+            { id: 'overview' as const, label: 'Overview' },
+            { id: 'history' as const, label: 'History' },
+          ].map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                activeTab === tab
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
-                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 h-8 rounded-md text-xs font-medium transition-colors ${
+                activeTab === tab.id 
+                  ? 'bg-white/10 text-white' 
+                  : 'text-white/40 hover:text-white/60'
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab.label}
             </button>
           ))}
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'overview' && (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-5 h-5 text-white/30 animate-spin" />
+          </div>
+        ) : activeTab === 'overview' ? (
           <div className="space-y-6">
-            {/* PNL Chart - Full Width */}
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm">
-              <h3 className="font-display font-semibold mb-4 flex items-center gap-2 text-white">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                Performance Overview
-              </h3>
+            {/* PNL Chart */}
+            <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-4">
+              <h3 className="text-sm font-medium text-white/80 mb-4">Performance</h3>
               <PnlChart walletAddress={wallet.address || undefined} height={180} showStats={true} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Performance Card */}
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm">
-              <h3 className="font-display font-semibold mb-4 flex items-center gap-2 text-white">
-                <BarChart2 className="w-4 h-4 text-cyan-400" />
-                Statistics
-              </h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">Profit Factor</span>
-                  <span className="font-mono font-medium text-white">{stats?.profitFactor?.toFixed(2) || '0.00'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">Max Drawdown</span>
-                  <span className="font-mono font-medium text-red-400">{stats?.maxDrawdown?.toFixed(1) || '0.0'}%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">Avg Trades/Day</span>
-                  <span className="font-mono font-medium text-white">{stats?.avgTradesPerDay?.toFixed(1) || '0.0'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">Total Volume</span>
-                  <span className="font-mono font-medium text-white">${(stats?.totalVolume || 0).toLocaleString()}</span>
-                </div>
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-4">
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Profit Factor</p>
+                <p className="text-xl font-semibold text-emerald-400">
+                  {stats?.profitFactor?.toFixed(2) || '0.00'}
+                </p>
               </div>
-            </div>
-
-            {/* Best/Worst Month */}
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm">
-              <h3 className="font-display font-semibold mb-4 flex items-center gap-2 text-white">
-                <Award className="w-4 h-4 text-amber-400" />
-                Monthly Records
-              </h3>
-              <div className="space-y-4">
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  <div className="text-xs text-emerald-400 mb-1">Best Month</div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-white">{stats?.bestMonth?.month || 'N/A'}</span>
-                    <span className="font-mono font-bold text-emerald-400">
-                      {formatPnl(stats?.bestMonth?.pnl || 0)}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                  <div className="text-xs text-red-400 mb-1">Worst Month</div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-white">{stats?.worstMonth?.month || 'N/A'}</span>
-                    <span className="font-mono font-bold text-red-400">
-                      {formatPnl(stats?.worstMonth?.pnl || 0)}
-                    </span>
-                  </div>
-                </div>
+              <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-4">
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Max Drawdown</p>
+                <p className="text-xl font-semibold text-red-400">
+                  -{stats?.maxDrawdown?.toFixed(1) || '0.0'}%
+                </p>
               </div>
-            </div>
-
-            {/* Account Info */}
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm">
-              <h3 className="font-display font-semibold mb-4 flex items-center gap-2 text-white">
-                <Shield className="w-4 h-4 text-purple-400" />
-                Account
-              </h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">Status</span>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">Active</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">Network</span>
-                  <span className="font-mono text-sm text-white">Hyperliquid</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">Mode</span>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">Live Trading</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-white/50">API Status</span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-xs text-emerald-400">Connected</span>
-                  </span>
-                </div>
-              </div>
-            </div>
             </div>
           </div>
-        )}
-
-        {activeTab === 'history' && (
-          <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden backdrop-blur-sm">
-            <div className="p-4 border-b border-white/10">
-              <h3 className="font-display font-semibold text-white">Trade History</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-white/5">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-white/40">Symbol</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-white/40">Side</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-white/40">Entry</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-white/40">Exit</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-white/40">PnL</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-white/40">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trades.length > 0 ? (
-                    trades.map(trade => (
-                      <tr key={trade.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-3 font-mono text-sm text-white">{trade.symbol}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            trade.side === 'long' 
-                              ? 'bg-emerald-500/20 text-emerald-400' 
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {trade.side.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-sm text-white/70">${trade.entryPrice?.toLocaleString()}</td>
-                        <td className="px-4 py-3 font-mono text-sm text-white/70">${trade.exitPrice?.toLocaleString()}</td>
-                        <td className={`px-4 py-3 font-mono text-sm font-medium ${
-                          trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+        ) : (
+          <div className="space-y-4">
+            {/* Trade History */}
+            <div className="rounded-xl border border-white/[0.06] overflow-hidden">
+              <div className="px-4 py-3 bg-white/[0.02] border-b border-white/[0.04] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-white/40" />
+                  <span className="text-sm font-medium text-white/80">Trade History</span>
+                </div>
+                <span className="text-xs text-white/30">{trades.length} trades</span>
+              </div>
+              
+              {trades.length > 0 ? (
+                <div className="divide-y divide-white/[0.04]">
+                  {trades.map(trade => (
+                    <div key={trade.id} className="px-4 py-3 flex items-center justify-between hover:bg-white/[0.02]">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          trade.side === 'long' ? 'bg-emerald-500/10' : 'bg-red-500/10'
                         }`}>
+                          {trade.side === 'long' 
+                            ? <TrendingUp className="w-4 h-4 text-emerald-400" />
+                            : <TrendingDown className="w-4 h-4 text-red-400" />
+                          }
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white/80">{trade.symbol}</p>
+                          <p className="text-[10px] text-white/30">
+                            {new Date(trade.exitTime).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-medium ${trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {formatPnl(trade.pnl)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-white/40">
-                          {new Date(trade.exitTime).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-12 text-center text-white/40">
-                        <Activity className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                        No trades yet
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="max-w-2xl space-y-6">
-            {/* Preferences */}
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm">
-              <h3 className="font-display font-semibold mb-4 flex items-center gap-2 text-white">
-                <Settings className="w-4 h-4 text-emerald-400" />
-                Preferences
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between py-3 border-b border-white/5">
-                  <div className="flex items-center gap-3">
-                    {darkMode ? <Moon className="w-4 h-4 text-purple-400" /> : <Sun className="w-4 h-4 text-amber-400" />}
-                    <div>
-                      <div className="font-medium text-sm text-white">Dark Mode</div>
-                      <div className="text-xs text-white/40">Use dark theme</div>
+                        </p>
+                        <p className="text-[10px] text-white/30">
+                          {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(1)}%
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => setDarkMode(!darkMode)}
-                    className={`w-12 h-6 rounded-full transition-colors ${darkMode ? 'bg-emerald-500' : 'bg-white/20'}`}
-                  >
-                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                  </button>
+                  ))}
                 </div>
-
-                <div className="flex items-center justify-between py-3 border-b border-white/5">
-                  <div className="flex items-center gap-3">
-                    <Bell className="w-4 h-4 text-cyan-400" />
-                    <div>
-                      <div className="font-medium text-sm text-white">Notifications</div>
-                      <div className="text-xs text-white/40">Trade alerts and updates</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setNotifications(!notifications)}
-                    className={`w-12 h-6 rounded-full transition-colors ${notifications ? 'bg-emerald-500' : 'bg-white/20'}`}
-                  >
-                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${notifications ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                  </button>
+              ) : (
+                <div className="py-12 text-center">
+                  <Clock className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                  <p className="text-sm text-white/30">No trades yet</p>
                 </div>
-
-                <div className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
-                    <Activity className="w-4 h-4 text-amber-400" />
-                    <div>
-                      <div className="font-medium text-sm text-white">Sound Alerts</div>
-                      <div className="text-xs text-white/40">Play sounds for trades</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSoundAlerts(!soundAlerts)}
-                    className={`w-12 h-6 rounded-full transition-colors ${soundAlerts ? 'bg-emerald-500' : 'bg-white/20'}`}
-                  >
-                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${soundAlerts ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Danger Zone */}
-            <div className="rounded-2xl bg-red-500/5 border border-red-500/20 p-6">
-              <h3 className="font-display font-semibold mb-4 text-red-400">Danger Zone</h3>
-              <div className="space-y-3">
-                <button className="w-full px-4 py-2.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium">
-                  Reset All Settings
-                </button>
-                <button 
-                  onClick={() => { disconnect(); router.push('/'); }}
-                  className="w-full px-4 py-2.5 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
-                >
-                  Disconnect Wallet
-                </button>
-              </div>
+              )}
             </div>
           </div>
         )}

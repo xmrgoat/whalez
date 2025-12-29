@@ -3,18 +3,20 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@/context/WalletContext';
-import { TrendingUp, Shield, Zap, BarChart3, ArrowRight, Wallet, Brain, Target, Clock, Activity, Sparkles, Book } from 'lucide-react';
+import { TrendingUp, Shield, Zap, BarChart3, ArrowRight, Wallet, Brain, Target, Clock, Activity, Sparkles, Book, Bot, Library, Users } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
   const { wallet, connect } = useWallet();
   const [livePrice, setLivePrice] = useState({ btc: 0, change: 0 });
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  
   // Fetch live BTC price
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/market/ticker?symbol=BTC-PERP');
+        const res = await fetch(`${API_URL}/api/market/ticker?symbol=BTC-PERP`);
         if (res.ok) {
           const data = await res.json();
           setLivePrice({ btc: data.price || 0, change: data.change24h || 0 });
@@ -236,6 +238,49 @@ export default function Home() {
                   <h3 className="font-display text-lg font-bold mb-2 text-white">Advanced Charts</h3>
                   <p className="text-white/50 text-sm leading-relaxed">
                     Professional trading charts with 27+ indicators, drawing tools, Fibonacci, Elliott Waves, and real-time trade markers.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* New Bot Builder & Community Features */}
+          <div className="grid md:grid-cols-3 gap-6 mt-6">
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border border-indigo-500/20 backdrop-blur-sm hover:border-indigo-500/40 transition-all cursor-pointer group" onClick={() => router.push('/bots')}>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <Bot className="w-6 h-6 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="font-display text-lg font-bold mb-2 text-white">Multi-Bot System</h3>
+                  <p className="text-white/50 text-sm leading-relaxed">
+                    Create up to 5 custom bots with templates, no-code builder, or AI assistance.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-teal-500/10 to-cyan-500/10 border border-teal-500/20 backdrop-blur-sm hover:border-teal-500/40 transition-all cursor-pointer group" onClick={() => router.push('/library')}>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <Library className="w-6 h-6 text-teal-400" />
+                </div>
+                <div>
+                  <h3 className="font-display text-lg font-bold mb-2 text-white">Community Library</h3>
+                  <p className="text-white/50 text-sm leading-relaxed">
+                    Browse, remix, and share strategies with on-chain verified performance.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 backdrop-blur-sm hover:border-amber-500/40 transition-all cursor-pointer group" onClick={() => router.push('/backtest')}>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <BarChart3 className="w-6 h-6 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-display text-lg font-bold mb-2 text-white">Backtesting</h3>
+                  <p className="text-white/50 text-sm leading-relaxed">
+                    Test strategies on historical data with Grok AI simulation before going live.
                   </p>
                 </div>
               </div>

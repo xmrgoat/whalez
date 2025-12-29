@@ -1,5 +1,9 @@
 // Types
 export * from './types/index.js';
+export * from './types/user-bot.types.js';
+
+// Templates
+export * from './templates/strategy-templates.js';
 
 // Adapters
 export * from './adapters/index.js';
