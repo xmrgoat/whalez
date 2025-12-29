@@ -5,10 +5,11 @@ import type {
   Signal,
   Trade 
 } from '../types/index.js';
+import { kellyPositionSize, valueAtRisk, volatilityClustering } from '../lib/quant-indicators.js';
 
 /**
- * Risk Engine
- * Manages position sizing, stop losses, and risk constraints.
+ * Risk Engine v2
+ * Manages position sizing with Kelly Criterion, VaR, and advanced risk constraints.
  */
 
 export interface RiskCheckResult {
@@ -17,6 +18,8 @@ export interface RiskCheckResult {
   adjustedQuantity?: number;
   stopLoss?: number;
   takeProfit?: number;
+  kellyFraction?: number;
+  riskScore?: number;
 }
 
 export interface RiskState {
@@ -28,12 +31,24 @@ export interface RiskState {
   lastLossTime?: number;
   dailyPnl: number;
   dailyTrades: number;
+  consecutiveLosses: number;
+  consecutiveWins: number;
+  recentReturns: number[];
+}
+
+export interface TradeHistory {
+  winRate: number;
+  avgWin: number;
+  avgLoss: number;
+  totalTrades: number;
 }
 
 export class RiskEngine {
   private config: RiskConfig;
   private state: RiskState;
   private peakEquity: number = 0;
+
+  private tradeHistory: TradeHistory = { winRate: 0.5, avgWin: 0, avgLoss: 0, totalTrades: 0 };
 
   constructor(config: RiskConfig, initialEquity: number = 10000) {
     this.config = config;
@@ -45,6 +60,9 @@ export class RiskEngine {
       maxDrawdown: 0,
       dailyPnl: 0,
       dailyTrades: 0,
+      consecutiveLosses: 0,
+      consecutiveWins: 0,
+      recentReturns: [],
     };
     this.peakEquity = initialEquity;
   }
@@ -79,15 +97,64 @@ export class RiskEngine {
   }
 
   /**
-   * Record a closed trade for risk tracking
+   * Record a closed trade for risk tracking and update trade history
    */
   recordTrade(trade: Trade): void {
     if (trade.pnl !== undefined) {
       this.state.dailyPnl += trade.pnl;
       this.state.dailyTrades++;
 
+      // Track consecutive wins/losses
       if (trade.pnl < 0) {
         this.state.lastLossTime = Date.now();
+        this.state.consecutiveLosses++;
+        this.state.consecutiveWins = 0;
+      } else if (trade.pnl > 0) {
+        this.state.consecutiveWins++;
+        this.state.consecutiveLosses = 0;
+      }
+
+      // Track returns for VaR calculation
+      if (trade.pnlPercent !== undefined) {
+        this.state.recentReturns.push(trade.pnlPercent / 100);
+        if (this.state.recentReturns.length > 100) {
+          this.state.recentReturns.shift();
+        }
+      }
+
+      // Update trade history for Kelly Criterion
+      this.updateTradeHistory(trade);
+    }
+  }
+
+  /**
+   * Update trade history statistics for Kelly Criterion
+   */
+  private updateTradeHistory(trade: Trade): void {
+    const isWin = (trade.pnl || 0) > 0;
+    const pnlAbs = Math.abs(trade.pnl || 0);
+
+    this.tradeHistory.totalTrades++;
+    
+    if (isWin) {
+      const prevWins = this.tradeHistory.winRate * (this.tradeHistory.totalTrades - 1);
+      this.tradeHistory.winRate = (prevWins + 1) / this.tradeHistory.totalTrades;
+      
+      // Update average win (exponential moving average)
+      if (this.tradeHistory.avgWin === 0) {
+        this.tradeHistory.avgWin = pnlAbs;
+      } else {
+        this.tradeHistory.avgWin = this.tradeHistory.avgWin * 0.9 + pnlAbs * 0.1;
+      }
+    } else {
+      const prevWins = this.tradeHistory.winRate * (this.tradeHistory.totalTrades - 1);
+      this.tradeHistory.winRate = prevWins / this.tradeHistory.totalTrades;
+      
+      // Update average loss
+      if (this.tradeHistory.avgLoss === 0) {
+        this.tradeHistory.avgLoss = pnlAbs;
+      } else {
+        this.tradeHistory.avgLoss = this.tradeHistory.avgLoss * 0.9 + pnlAbs * 0.1;
       }
     }
   }
@@ -155,15 +222,49 @@ export class RiskEngine {
   }
 
   /**
-   * Calculate position size based on risk percentage
+   * Calculate position size using Kelly Criterion and risk adjustments
    */
-  calculatePositionSize(entryPrice: number, atr: number): number {
-    const riskAmount = this.state.equity * (this.config.maxPositionSizePercent / 100);
+  calculatePositionSize(entryPrice: number, atr: number, volatilityRatio?: number): number {
+    if (entryPrice <= 0 || atr <= 0) return 0;
+
+    // Base position size from config
+    let baseRiskPct = this.config.maxPositionSizePercent / 100;
+
+    // Apply Kelly Criterion if we have enough trade history
+    if (this.tradeHistory.totalTrades >= 20 && this.tradeHistory.avgLoss > 0) {
+      const kellyFraction = kellyPositionSize(
+        this.tradeHistory.winRate,
+        this.tradeHistory.avgWin,
+        this.tradeHistory.avgLoss,
+        0.25 // Use quarter Kelly for safety
+      );
+      
+      // Blend Kelly with base risk (50/50)
+      if (kellyFraction > 0) {
+        baseRiskPct = (baseRiskPct + kellyFraction) / 2;
+      }
+    }
+
+    // Reduce position after consecutive losses
+    const lossReduction = Math.pow(0.8, Math.min(this.state.consecutiveLosses, 5));
+    baseRiskPct *= lossReduction;
+
+    // Reduce position in high volatility
+    if (volatilityRatio && volatilityRatio > 1.5) {
+      baseRiskPct *= 0.7; // Reduce 30% in high vol
+    }
+
+    // Apply VaR constraint if we have return history
+    if (this.state.recentReturns.length >= 20) {
+      const var95 = valueAtRisk(this.state.recentReturns, 0.95);
+      const maxRiskFromVaR = var95 > 0 ? 0.02 / var95 : 1; // Target max 2% VaR
+      baseRiskPct = Math.min(baseRiskPct, maxRiskFromVaR);
+    }
+
+    const riskAmount = this.state.equity * baseRiskPct;
     const stopDistance = atr * this.config.stopLossAtrMultiplier;
     
-    if (stopDistance <= 0 || entryPrice <= 0) {
-      return 0;
-    }
+    if (stopDistance <= 0) return 0;
 
     // Position size = Risk Amount / Stop Distance
     const positionSize = riskAmount / stopDistance;
@@ -173,6 +274,36 @@ export class RiskEngine {
     const maxQuantity = maxPositionValue / entryPrice;
 
     return Math.min(positionSize, maxQuantity);
+  }
+
+  /**
+   * Get Kelly fraction for current trade history
+   */
+  getKellyFraction(): number {
+    if (this.tradeHistory.totalTrades < 10 || this.tradeHistory.avgLoss <= 0) {
+      return 0;
+    }
+    return kellyPositionSize(
+      this.tradeHistory.winRate,
+      this.tradeHistory.avgWin,
+      this.tradeHistory.avgLoss,
+      0.25
+    );
+  }
+
+  /**
+   * Get current VaR (95% confidence)
+   */
+  getVaR95(): number {
+    if (this.state.recentReturns.length < 10) return 0;
+    return valueAtRisk(this.state.recentReturns, 0.95) * 100;
+  }
+
+  /**
+   * Get trade history statistics
+   */
+  getTradeHistory(): TradeHistory {
+    return { ...this.tradeHistory };
   }
 
   /**

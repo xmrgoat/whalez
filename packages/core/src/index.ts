@@ -48,3 +48,30 @@ export {
 
 // Services
 export * from './services/grok-client.js';
+export { default as EnhancedGrokService, enhancedGrok } from './services/grok-enhanced.js';
+export { 
+  default as GrokMacroService, 
+  grokMacroService,
+  type GrokMacroAnalysis,
+  type GrokCostStats,
+  type GrokMacroConfig,
+  type SymbolMacroAnalysis,
+  type MacroEvent,
+  type NewsItem,
+} from './services/grok-macro.service.js';
+
+// Quant Indicators
+export * from './lib/quant-indicators.js';
+
+// Realtime Data Service
+export { 
+  RealtimeDataService, 
+  getRealtimeDataService,
+  type OrderBook,
+  type OrderBookLevel,
+  type FundingData,
+  type LiquidationData,
+  type TradeData,
+  type MarketContext,
+  type MarketInfo,
+} from './services/realtime-data.service.js';

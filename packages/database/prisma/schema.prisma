@@ -324,3 +324,584 @@ model MarketSnapshot {
   @@index([symbol, timeframe])
   @@index([timestamp])
 }
+
+// ============ AI Learning System ============
+
+// Stores AI rules and templates that Grok must follow
+model AIRule {
+  id          String       @id @default(cuid())
+  botId       String?      // null = global rule
+  category    AIRuleCategory
+  name        String
+  description String
+  template    String       // The actual prompt template
+  isActive    Boolean      @default(true)
+  isSystem    Boolean      @default(false) // System rules can't be deleted
+  priority    Int          @default(0)     // Higher = more important
+  constraints Json?        // Min/max limits for parameters
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([botId])
+  @@index([category])
+  @@index([isActive])
+}
+
+enum AIRuleCategory {
+  MACRO_ANALYSIS      // Rules for macro/news analysis
+  TECHNICAL_ANALYSIS  // Rules for technical indicators
+  RISK_MANAGEMENT     // Rules for position sizing, SL/TP
+  ENTRY_CONDITIONS    // Rules for when to enter
+  EXIT_CONDITIONS     // Rules for when to exit
+  SELF_CRITIQUE       // Rules for self-analysis
+  USER_CUSTOM         // User-defined custom rules
+}
+
+// Stores insights learned from trading history
+model AIInsight {
+  id          String      @id @default(cuid())
+  botId       String
+  type        InsightType
+  title       String
+  description String
+  confidence  Float       // 0-100, how confident is this insight
+  dataPoints  Int         // Number of trades/events this is based on
+  evidence    Json        // Supporting data
+  isValid     Boolean     @default(true) // Can be invalidated by new data
+  appliedAt   DateTime?   // When user applied this insight
+  createdAt   DateTime    @default(now())
+  expiresAt   DateTime?   // Some insights may expire
+
+  @@index([botId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum InsightType {
+  PATTERN_DETECTED     // Recurring pattern in trades
+  PARAMETER_SUGGESTION // Suggestion to change a parameter
+  RISK_WARNING         // Warning about risk exposure
+  PERFORMANCE_TREND    // Trend in performance metrics
+  MARKET_CONDITION     // Observation about market conditions
+  STRATEGY_IMPROVEMENT // Suggestion to improve strategy
+}
+
+// Stores AI suggestions for the user
+model AISuggestion {
+  id           String           @id @default(cuid())
+  botId        String
+  type         SuggestionType
+  title        String
+  description  String
+  reasoning    String           // Detailed explanation with sources
+  impact       String           // Expected impact if applied
+  confidence   Float            // 0-100
+  priority     SuggestionPriority
+  status       SuggestionStatus @default(PENDING)
+  parameters   Json?            // Suggested parameter changes
+  sources      Json             // Real data sources (X posts, news, indicators)
+  userFeedback String?          // User's feedback if rejected
+  createdAt    DateTime         @default(now())
+  reviewedAt   DateTime?
+  appliedAt    DateTime?
+
+  @@index([botId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum SuggestionType {
+  PARAMETER_CHANGE
+  RULE_ADDITION
+  RULE_MODIFICATION
+  RISK_ADJUSTMENT
+  STRATEGY_CHANGE
+  MARKET_ALERT
+}
+
+enum SuggestionPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SuggestionStatus {
+  PENDING
+  VIEWED
+  APPLIED
+  REJECTED
+  EXPIRED
+}
+
+// Stores real-time data from external sources (X, news)
+model ExternalData {
+  id          String           @id @default(cuid())
+  source      ExternalSource
+  sourceId    String           // Original ID from source
+  content     String
+  author      String?
+  url         String?
+  sentiment   String?          // bullish, bearish, neutral
+  relevance   Float?           // 0-100, how relevant to trading
+  symbols     String[]         // Related symbols
+  metadata    Json?
+  fetchedAt   DateTime         @default(now())
+  expiresAt   DateTime         // When this data becomes stale
+
+  @@unique([source, sourceId])
+  @@index([source])
+  @@index([fetchedAt])
+  @@index([symbols])
+}
+
+enum ExternalSource {
+  X_TWITTER
+  NEWS_API
+  COINGECKO
+  HYPERLIQUID
+  USER_INPUT
+}
+
+// Stores Grok analysis results for audit trail
+model GrokAnalysis {
+  id              String        @id @default(cuid())
+  botId           String?
+  analysisType    GrokAnalysisType
+  query           String        // What was asked
+  prompt          String        // Full prompt sent to Grok
+  response        String        // Raw response
+  parsedResult    Json          // Structured result
+  sources         Json          // Sources used
+  confidence      Float         // 0-100
+  processingTimeMs Int
+  tokenCount      Int?
+  createdAt       DateTime      @default(now())
+
+  @@index([botId])
+  @@index([analysisType])
+  @@index([createdAt])
+}
+
+enum GrokAnalysisType {
+  MACRO_SENTIMENT
+  RUMOR_CHECK
+  TRADE_ANALYSIS
+  SELF_CRITIQUE
+  PARAMETER_OPTIMIZATION
+  MARKET_REGIME
+}
+
+// Stores user-defined limits and guardrails
+model UserGuardrail {
+  id          String         @id @default(cuid())
+  botId       String
+  parameter   String         // e.g. "leverage", "positionSizePct"
+  minValue    Float?
+  maxValue    Float?
+  description String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([botId, parameter])
+  @@index([botId])
+}
+
+// Stores the learning history for continuous improvement
+model LearningEntry {
+  id          String       @id @default(cuid())
+  botId       String
+  entryType   LearningType
+  context     Json         // Market conditions, indicators at time
+  action      String       // What action was taken
+  outcome     String       // What happened
+  lesson      String       // What was learned
+  confidence  Float        // How confident in this lesson
+  tradeIds    String[]     // Related trades
+  createdAt   DateTime     @default(now())
+
+  @@index([botId])
+  @@index([entryType])
+  @@index([createdAt])
+}
+
+enum LearningType {
+  SUCCESSFUL_TRADE
+  FAILED_TRADE
+  MISSED_OPPORTUNITY
+  AVOIDED_LOSS
+  PARAMETER_CHANGE_RESULT
+  MARKET_REGIME_CHANGE
+}
+
+// ============ AI Thinking Logs (Real-time streaming) ============
+
+// Stores complete AI thinking sessions for replay and audit
+model AIThinkingSession {
+  id              String   @id @default(cuid())
+  botId           String?
+  userId          String?
+  symbol          String
+  timeframe       String
+  sessionType     AISessionType
+  status          AISessionStatus @default(IN_PROGRESS)
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  totalDurationMs Int?
+  finalAction     String?  // LONG, SHORT, HOLD, etc.
+  finalConfidence Float?
+  inputData       Json     // Price, indicators, etc. at start
+  outputData      Json?    // Final analysis result
+  
+  steps AIThinkingStep[]
+  
+  @@index([botId])
+  @@index([userId])
+  @@index([symbol, timeframe])
+  @@index([startedAt])
+  @@index([status])
+}
+
+enum AISessionType {
+  MARKET_ANALYSIS
+  TRADE_DECISION
+  SELF_CRITIQUE
+  PARAMETER_OPTIMIZATION
+  SENTIMENT_CHECK
+}
+
+enum AISessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Individual thinking steps within a session
+model AIThinkingStep {
+  id          String   @id @default(cuid())
+  sessionId   String
+  stepNumber  Int
+  stepType    AIStepType
+  title       String   // e.g. "Analyzing Price Action", "Checking RSI"
+  content     String   // The actual thinking/reasoning
+  data        Json?    // Any associated data (indicator values, etc.)
+  status      AIStepStatus @default(PENDING)
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+  
+  session AIThinkingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([stepNumber])
+}
+
+enum AIStepType {
+  DATA_COLLECTION     // Gathering price, volume, indicators
+  INDICATOR_ANALYSIS  // Analyzing technical indicators
+  SENTIMENT_ANALYSIS  // Analyzing X/Twitter sentiment
+  NEWS_ANALYSIS       // Analyzing news
+  CONFIRMATION_CHECK  // Checking confirmations
+  RISK_ASSESSMENT     // Assessing risk
+  DECISION_MAKING     // Making final decision
+  REASONING           // General reasoning step
+}
+
+enum AIStepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  FAILED
+}
+
+// ============ User Statistics & Portfolio ============
+
+// Wallet-based user profile (DeFi - no email)
+model WalletProfile {
+  id              String   @id @default(cuid())
+  walletAddress   String   @unique
+  nickname        String?
+  avatarUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastActiveAt    DateTime @default(now())
+  
+  // Settings
+  settings        Json?    // User preferences
+  
+  // Relations
+  portfolioStats  PortfolioStats?
+  dailyStats      DailyStats[]
+  tradeHistory    TradeHistory[]
+  walletTrades    WalletTrade[]
+  referrals       Referral[]      @relation("Referrer")
+  referredBy      Referral?       @relation("Referred")
+  
+  @@index([walletAddress])
+}
+
+// Overall portfolio statistics
+model PortfolioStats {
+  id              String   @id @default(cuid())
+  walletAddress   String   @unique
+  
+  // Equity tracking
+  initialEquity   Float    @default(0)
+  currentEquity   Float    @default(0)
+  peakEquity      Float    @default(0)
+  
+  // PNL
+  totalPnl        Float    @default(0)
+  realizedPnl     Float    @default(0)
+  unrealizedPnl   Float    @default(0)
+  
+  // Trade statistics
+  totalTrades     Int      @default(0)
+  winningTrades   Int      @default(0)
+  losingTrades    Int      @default(0)
+  winRate         Float    @default(0)
+  
+  // Performance metrics
+  avgWin          Float    @default(0)
+  avgLoss         Float    @default(0)
+  largestWin      Float    @default(0)
+  largestLoss     Float    @default(0)
+  profitFactor    Float    @default(0)
+  expectancy      Float    @default(0)
+  sharpeRatio     Float    @default(0)
+  
+  // Drawdown
+  maxDrawdown     Float    @default(0)
+  maxDrawdownPct  Float    @default(0)
+  currentDrawdown Float    @default(0)
+  
+  // Streaks
+  currentStreak   Int      @default(0)  // Positive = wins, negative = losses
+  longestWinStreak  Int    @default(0)
+  longestLoseStreak Int    @default(0)
+  
+  // Time-based
+  avgHoldTime     Int      @default(0)  // In seconds
+  
+  updatedAt       DateTime @updatedAt
+  
+  profile WalletProfile @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+  
+  @@index([walletAddress])
+}
+
+// Daily statistics snapshot
+model DailyStats {
+  id              String   @id @default(cuid())
+  walletAddress   String
+  date            DateTime @db.Date
+  
+  // Daily PNL
+  pnl             Float    @default(0)
+  pnlPercent      Float    @default(0)
+  
+  // Daily trades
+  trades          Int      @default(0)
+  wins            Int      @default(0)
+  losses          Int      @default(0)
+  winRate         Float    @default(0)
+  
+  // Volume
+  volume          Float    @default(0)
+  fees            Float    @default(0)
+  
+  // Equity at end of day
+  equity          Float    @default(0)
+  
+  createdAt       DateTime @default(now())
+  
+  profile WalletProfile @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+  
+  @@unique([walletAddress, date])
+  @@index([walletAddress])
+  @@index([date])
+}
+
+// Trade history for user
+model TradeHistory {
+  id              String   @id @default(cuid())
+  walletAddress   String
+  
+  // Trade details
+  symbol          String
+  side            String   // 'long' or 'short'
+  entryPrice      Float
+  exitPrice       Float?
+  quantity        Float
+  leverage        Int      @default(1)
+  
+  // PNL
+  pnl             Float?
+  pnlPercent      Float?
+  fees            Float    @default(0)
+  
+  // Timing
+  entryTime       DateTime
+  exitTime        DateTime?
+  holdDuration    Int?     // In seconds
+  
+  // AI decision reference
+  decisionId      String?
+  aiConfidence    Float?
+  aiReasoning     String?
+  
+  // Status
+  status          TradeStatus @default(OPEN)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  profile WalletProfile @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+  
+  @@index([walletAddress])
+  @@index([symbol])
+  @@index([entryTime])
+  @@index([status])
+}
+
+// Referral system (for future)
+model Referral {
+  id              String   @id @default(cuid())
+  referrerAddress String
+  referredAddress String   @unique
+  
+  // Referral code used
+  code            String
+  
+  // Rewards
+  referrerReward  Float    @default(0)
+  referredReward  Float    @default(0)
+  
+  // Status
+  status          ReferralStatus @default(PENDING)
+  
+  createdAt       DateTime @default(now())
+  activatedAt     DateTime?
+  
+  referrer WalletProfile @relation("Referrer", fields: [referrerAddress], references: [walletAddress], onDelete: Cascade)
+  referred WalletProfile @relation("Referred", fields: [referredAddress], references: [walletAddress], onDelete: Cascade)
+  
+  @@index([referrerAddress])
+  @@index([code])
+}
+
+enum ReferralStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+}
+
+// ============ Backtest History ============
+
+model BacktestResult {
+  id              String   @id @default(cuid())
+  walletAddress   String?
+  
+  // Configuration
+  symbol          String
+  strategy        String
+  strategyParams  Json?
+  timeframe       String
+  startTime       DateTime
+  endTime         DateTime
+  initialCapital  Float
+  positionSizePct Float
+  maxLeverage     Int
+  stopLossPct     Float
+  takeProfitPct   Float
+  tradingFee      Float
+  slippage        Float
+  enableTrailingStop Boolean @default(false)
+  trailingStopPct Float?
+  
+  // Core Metrics
+  totalReturn     Float
+  totalReturnPct  Float
+  annualizedReturn Float
+  maxDrawdown     Float
+  maxDrawdownPct  Float
+  sharpeRatio     Float
+  sortinoRatio    Float
+  calmarRatio     Float
+  
+  // Trade Statistics
+  totalTrades     Int
+  winningTrades   Int
+  losingTrades    Int
+  winRate         Float
+  profitFactor    Float
+  avgWin          Float
+  avgLoss         Float
+  expectancy      Float
+  maxConsecutiveWins Int
+  maxConsecutiveLosses Int
+  
+  // Advanced Quant Metrics
+  kellyFraction   Float?
+  optimalPositionSize Float?
+  valueAtRisk95   Float?
+  omegaRatio      Float?
+  skewness        Float?
+  kurtosis        Float?
+  avgHoldingPeriod Float?
+  riskRewardRatio Float?
+  buyAndHoldReturn Float?
+  alphaVsBuyHold  Float?
+  
+  // Data
+  trades          Json     // Array of BacktestTrade
+  equityCurve     Json     // Array of EquityPoint
+  monthlyReturns  Json?    // Array of monthly returns
+  
+  // Metadata
+  executionTimeMs Int?
+  candlesCount    Int?
+  notes           String?
+  tags            String[]
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([walletAddress])
+  @@index([symbol])
+  @@index([strategy])
+  @@index([createdAt])
+}
+
+// ============ Wallet Trades (Direct Trading) ============
+
+model WalletTrade {
+  id              String   @id @default(cuid())
+  walletAddress   String
+  symbol          String
+  side            TradeSide
+  entryPrice      Float
+  exitPrice       Float?
+  quantity        Float
+  leverage        Int      @default(1)
+  stopLoss        Float?
+  takeProfit      Float?
+  entryFee        Float    @default(0)
+  exitFee         Float    @default(0)
+  pnl             Float?
+  pnlWithFees     Float?
+  confidence      Int?
+  reasoning       String?
+  status          TradeStatus @default(OPEN)
+  entryTime       DateTime @default(now())
+  exitTime        DateTime?
+  metadata        Json?    // Additional data like order IDs, etc.
+  
+  profile WalletProfile? @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+  
+  @@index([walletAddress])
+  @@index([symbol])
+  @@index([status])
+  @@index([entryTime])
+}

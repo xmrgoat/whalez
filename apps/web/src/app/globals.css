@@ -2,90 +2,251 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   WHALEZ TRADING - DARK THEME DESIGN SYSTEM
+   ============================================ */
+
 :root {
-  --background: #F3F3F3;
-  --foreground: #000000;
-  --muted: #f0f0f0;
-  --muted-foreground: #737373;
-  --border: #e0e0e0;
-  --card: #F3F3F3;
-  --accent: #171717;
+  /* Dark Theme (Default) */
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #141414;
+  --card-foreground: #fafafa;
+  --muted: #1a1a1a;
+  --muted-foreground: #a1a1aa;
+  --border: #262626;
+  --ring: #22c55e;
+  
+  /* Semantic Colors */
+  --success: #22c55e;
+  --success-foreground: #052e16;
+  --danger: #ef4444;
+  --danger-foreground: #450a0a;
+  --warning: #f59e0b;
+  --warning-foreground: #451a03;
+  
+  /* Trading Colors */
+  --long: #22c55e;
+  --short: #ef4444;
+  --neutral: #6b7280;
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* Pixel font for headings */
-.font-pixel {
-  font-family: var(--font-pixel), 'Press Start 2P', cursive;
-}
-
-/* Monospace for body */
+/* Typography */
 .font-mono {
-  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-family: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
 }
 
-/* Custom scrollbar */
+.font-display {
+  font-family: var(--font-mono), 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Scrollbar - Dark Theme */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--muted);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
 
-/* Card styles */
+/* Card Component */
 .card {
-  @apply bg-card border border-border rounded-lg p-4;
+  @apply bg-card border border-border rounded-xl p-4;
 }
 
-/* Button styles */
+.card-glass {
+  @apply backdrop-blur-sm border rounded-xl p-4;
+  background-color: rgba(20, 20, 20, 0.8);
+  border-color: rgba(38, 38, 38, 0.5);
+}
+
+/* Button Variants */
 .btn {
-  @apply px-4 py-2 rounded border border-border bg-white hover:bg-muted transition-colors;
+  @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200;
+  @apply border border-border bg-card hover:bg-muted;
+  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
 }
 
 .btn-primary {
-  @apply bg-black text-white border-black hover:bg-accent;
+  @apply bg-success text-success-foreground border-success;
+  @apply hover:opacity-90;
 }
 
-/* Input styles */
+.btn-danger {
+  @apply bg-danger text-danger-foreground border-danger;
+  @apply hover:opacity-90;
+}
+
+.btn-ghost {
+  @apply bg-transparent border-transparent hover:bg-muted;
+}
+
+.btn-sm {
+  @apply px-3 py-1.5 text-xs;
+}
+
+.btn-lg {
+  @apply px-6 py-3 text-base;
+}
+
+/* Input Styles */
 .input {
-  @apply w-full px-3 py-2 border border-border rounded bg-white focus:outline-none focus:ring-1 focus:ring-black;
+  @apply w-full px-3 py-2 rounded-lg text-sm;
+  @apply bg-muted border border-border;
+  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
+  @apply placeholder:text-muted-foreground;
 }
 
-/* Table styles */
+/* Badge Styles */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-success {
+  @apply text-success;
+  background-color: rgba(34, 197, 94, 0.2);
+}
+
+.badge-danger {
+  @apply text-danger;
+  background-color: rgba(239, 68, 68, 0.2);
+}
+
+.badge-warning {
+  @apply text-warning;
+  background-color: rgba(245, 158, 11, 0.2);
+}
+
+.badge-neutral {
+  @apply bg-muted text-muted-foreground;
+}
+
+/* Stats Display */
+.stat-value {
+  @apply text-2xl font-mono font-bold tabular-nums;
+}
+
+.stat-label {
+  @apply text-xs text-muted-foreground uppercase tracking-wider;
+}
+
+.stat-change {
+  @apply text-sm font-mono tabular-nums;
+}
+
+.stat-change-positive {
+  @apply text-success;
+}
+
+.stat-change-negative {
+  @apply text-danger;
+}
+
+/* Price Display */
+.price {
+  @apply font-mono tabular-nums;
+}
+
+.price-up {
+  @apply text-success;
+}
+
+.price-down {
+  @apply text-danger;
+}
+
+/* Table Styles */
 .table {
-  @apply w-full border-collapse;
-}
-
-.table th,
-.table td {
-  @apply px-4 py-2 text-left border-b border-border;
+  @apply w-full text-sm;
 }
 
 .table th {
-  @apply font-semibold bg-muted;
+  @apply px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider;
+  @apply border-b border-border bg-muted;
 }
 
-.table tr:hover {
+.table td {
+  @apply px-4 py-3 border-b border-border;
+}
+
+.table tr:hover td {
   @apply bg-muted;
 }
 
-/* Spline viewer sizing */
-spline-viewer {
-  width: 100%;
-  height: 100%;
-  display: block;
+/* Animations */
+@keyframes pulse-success {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes flash-green {
+  0% { background-color: transparent; }
+  50% { background-color: rgba(34, 197, 94, 0.2); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+  0% { background-color: transparent; }
+  50% { background-color: rgba(239, 68, 68, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.animate-flash-green {
+  animation: flash-green 0.3s ease-out;
+}
+
+.animate-flash-red {
+  animation: flash-red 0.3s ease-out;
+}
+
+/* Utility Classes */
+.text-long { color: var(--long); }
+.text-short { color: var(--short); }
+.bg-long { background-color: var(--long); }
+.bg-short { background-color: var(--short); }
+
+/* Gradient Backgrounds */
+.gradient-success {
+  background: linear-gradient(to right, rgba(34, 197, 94, 0.2), transparent);
+}
+
+.gradient-danger {
+  background: linear-gradient(to right, rgba(239, 68, 68, 0.2), transparent);
+}
+
+/* KlineCharts - Remove blue selection border on overlays */
+.klinecharts-pro canvas,
+[class*="klinecharts"] canvas {
+  outline: none !important;
+}
+
+/* Hide default overlay point markers (blue circles) */
+.klinecharts-pro [data-overlay-point],
+[class*="klinecharts"] circle[fill="#2196F3"],
+[class*="klinecharts"] circle[stroke="#2196F3"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
 }

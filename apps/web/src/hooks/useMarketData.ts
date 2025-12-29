@@ -1,13 +1,12 @@
 /**
- * useMarketData Hook
+ * useMarketData Hook - ROBUST VERSION
  * 
- * Connects to the API WebSocket and provides real-time market data.
- * Handles reconnection, status tracking, and data normalization.
+ * Fetches market data via REST API with proper symbol tracking.
+ * Each symbol/timeframe combination gets its own isolated data.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
-const WS_URL = process.env['NEXT_PUBLIC_WS_URL'] || 'ws://localhost:3001/ws';
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001';
 
 export interface OHLC {
@@ -66,23 +65,32 @@ interface UseMarketDataOptions {
   autoConnect?: boolean;
 }
 
+// Data state interface
+interface MarketDataState {
+  candles: OHLC[];
+  currentCandle: OHLC | null;
+  ticker: { price: number; change24h: number } | null;
+  status: MarketStatus;
+  dataSymbol: string; // Track which symbol this data belongs to
+  dataTimeframe: string;
+}
+
+const initialState: MarketDataState = {
+  candles: [],
+  currentCandle: null,
+  ticker: null,
+  status: { connected: true, isDelayed: false, latencyMs: 0, lastUpdate: 0 },
+  dataSymbol: '',
+  dataTimeframe: '',
+};
+
 export function useMarketData(options: UseMarketDataOptions) {
-  const { symbol, timeframe, botId, autoConnect = true } = options;
+  const { symbol, timeframe, autoConnect = true } = options;
 
-  // Connection state
-  const [status, setStatus] = useState<MarketStatus>({
-    connected: false,
-    isDelayed: false,
-    latencyMs: 0,
-    lastUpdate: 0,
-  });
+  // Single state object to ensure atomic updates
+  const [state, setState] = useState<MarketDataState>(initialState);
 
-  // Market data
-  const [candles, setCandles] = useState<OHLC[]>([]);
-  const [currentCandle, setCurrentCandle] = useState<OHLC | null>(null);
-  const [ticker, setTicker] = useState<{ price: number; change24h: number } | null>(null);
-
-  // Bot data
+  // Bot data (kept for compatibility)
   const [decision, setDecision] = useState<BotDecision | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -92,249 +100,161 @@ export function useMarketData(options: UseMarketDataOptions) {
     armed: boolean;
   } | null>(null);
 
-  // WebSocket ref
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttempts = useRef(0);
+  // Unique key for this symbol/timeframe combination
+  const dataKey = useMemo(() => `${symbol}:${timeframe}`, [symbol, timeframe]);
 
-  // Fetch initial candles via REST
-  const fetchInitialCandles = useCallback(async () => {
+  // Main effect: fetch data when symbol/timeframe changes
+  useEffect(() => {
+    if (!autoConnect) return;
+    
+    // Create abort controller for this effect instance
+    const abortController = new AbortController();
+    const currentSymbol = symbol;
+    const currentTimeframe = timeframe;
+    const currentKey = dataKey;
+    
+    // Clear existing data immediately when symbol changes
+    setState({
+      ...initialState,
+      dataSymbol: currentSymbol,
+      dataTimeframe: currentTimeframe,
+    });
+    
+    // Fetch candles for the current symbol
+    const fetchCandles = async () => {
+      if (abortController.signal.aborted) return;
+      
+      try {
+        const response = await fetch(
+          `${API_URL}/api/market/candles?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=500`,
+          { signal: abortController.signal }
+        );
+        
+        if (!response.ok || abortController.signal.aborted) return;
+        
+        const data = await response.json();
+        
+        if (!abortController.signal.aborted && data.candles && Array.isArray(data.candles)) {
+          setState(prev => {
+            // Only update if this is still the current symbol
+            if (prev.dataSymbol !== currentSymbol || prev.dataTimeframe !== currentTimeframe) {
+              return prev;
+            }
+            return {
+              ...prev,
+              candles: data.candles,
+              currentCandle: data.candles.length > 0 ? data.candles[data.candles.length - 1] : null,
+              status: {
+                ...prev.status,
+                isDelayed: data.status?.isDelayed || false,
+                latencyMs: data.status?.latencyMs || 0,
+                lastUpdate: Date.now(),
+              },
+            };
+          });
+        }
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error(`[useMarketData] Failed to fetch candles for ${currentSymbol}:`, error);
+        }
+      }
+    };
+    
+    // Fetch ticker for the current symbol
+    const fetchTicker = async () => {
+      if (abortController.signal.aborted) return;
+      
+      try {
+        const response = await fetch(
+          `${API_URL}/api/market/ticker?symbol=${currentSymbol}`,
+          { signal: abortController.signal }
+        );
+        
+        if (!response.ok || abortController.signal.aborted) return;
+        
+        const data = await response.json();
+        
+        if (!abortController.signal.aborted) {
+          setState(prev => {
+            // Only update if this is still the current symbol
+            if (prev.dataSymbol !== currentSymbol) {
+              return prev;
+            }
+            return {
+              ...prev,
+              ticker: { 
+                price: data.price || data.last || 0, 
+                change24h: data.change24h || 0 
+              },
+            };
+          });
+        }
+      } catch (error: any) {
+        // Silently fail for ticker
+      }
+    };
+    
+    // Initial fetch
+    fetchCandles();
+    fetchTicker();
+    
+    // Poll for updates - use shorter interval for more responsive updates
+    const candlePollInterval = setInterval(fetchCandles, 5000);
+    const tickerPollInterval = setInterval(fetchTicker, 1000);
+    
+    return () => {
+      abortController.abort();
+      clearInterval(candlePollInterval);
+      clearInterval(tickerPollInterval);
+    };
+  }, [symbol, timeframe, autoConnect, dataKey]);
+
+  // Refetch function
+  const refetch = useCallback(async () => {
     try {
       const response = await fetch(
         `${API_URL}/api/market/candles?symbol=${symbol}&timeframe=${timeframe}&limit=500`
       );
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.candles && Array.isArray(data.candles)) {
-        setCandles(data.candles);
-        setStatus(prev => ({
-          ...prev,
-          isDelayed: data.status?.isDelayed || false,
-          latencyMs: data.status?.latencyMs || 0,
-          lastUpdate: Date.now(),
-        }));
-      }
-    } catch (error) {
-      console.error('[useMarketData] Failed to fetch candles:', error);
-    }
-  }, [symbol, timeframe]);
-
-  // Connect to WebSocket
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return;
-    }
-
-    try {
-      const ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('[useMarketData] WebSocket connected');
-        setStatus(prev => ({ ...prev, connected: true }));
-        reconnectAttempts.current = 0;
-
-        // Subscribe to candles
-        ws.send(JSON.stringify({
-          type: 'subscribe',
-          channel: 'candles',
-          symbol,
-          timeframe,
-        }));
-
-        // Subscribe to bot if botId provided
-        if (botId) {
-          ws.send(JSON.stringify({
-            type: 'subscribe',
-            channel: 'bot',
-            botId,
-          }));
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          handleMessage(message);
-        } catch (error) {
-          console.error('[useMarketData] Failed to parse message:', error);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('[useMarketData] WebSocket error:', error);
-      };
-
-      ws.onclose = () => {
-        console.log('[useMarketData] WebSocket closed');
-        setStatus(prev => ({ ...prev, connected: false }));
-        wsRef.current = null;
-
-        // Reconnect with exponential backoff
-        if (reconnectAttempts.current < 10) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-          reconnectAttempts.current++;
-          reconnectTimeoutRef.current = setTimeout(connect, delay);
-        }
-      };
-    } catch (error) {
-      console.error('[useMarketData] Failed to connect:', error);
-    }
-  }, [symbol, timeframe, botId]);
-
-  // Handle incoming messages
-  const handleMessage = useCallback((message: any) => {
-    const now = Date.now();
-
-    switch (message.type) {
-      case 'candles:snapshot':
-        if (message.symbol === symbol && message.timeframe === timeframe) {
-          setCandles(message.candles || []);
-          setStatus(prev => ({ ...prev, lastUpdate: now }));
-        }
-        break;
-
-      case 'candles:update':
-        if (message.symbol === symbol && message.timeframe === timeframe) {
-          const candle = message.candle;
-          setCurrentCandle(candle);
-          
-          setCandles(prev => {
-            const updated = [...prev];
-            const lastIdx = updated.length - 1;
-            
-            if (lastIdx >= 0 && updated[lastIdx]!.timestamp === candle.timestamp) {
-              // Update existing candle
-              updated[lastIdx] = candle;
-            } else if (message.isClosed || (lastIdx >= 0 && candle.timestamp > updated[lastIdx]!.timestamp)) {
-              // Add new candle
-              updated.push(candle);
-              // Keep max 500 candles
-              if (updated.length > 500) {
-                updated.shift();
-              }
+      if (response.ok) {
+        const data = await response.json();
+        if (data.candles && Array.isArray(data.candles)) {
+          setState(prev => {
+            if (prev.dataSymbol !== symbol || prev.dataTimeframe !== timeframe) {
+              return prev;
             }
-            
-            return updated;
-          });
-
-          setStatus(prev => ({
-            ...prev,
-            isDelayed: false,
-            lastUpdate: now,
-          }));
-        }
-        break;
-
-      case 'bot:decision':
-        if (!botId || message.botId === botId) {
-          setDecision({
-            ...message.decision,
-            timestamp: message.timestamp,
+            return {
+              ...prev,
+              candles: data.candles,
+              currentCandle: data.candles.length > 0 ? data.candles[data.candles.length - 1] : null,
+            };
           });
         }
-        break;
-
-      case 'bot:position':
-        if (!botId || message.botId === botId) {
-          setPosition(message.position);
-        }
-        break;
-
-      case 'bot:trade':
-        if (!botId || message.botId === botId) {
-          setTrades(prev => [{
-            ...message.trade,
-            timestamp: message.timestamp,
-          }, ...prev].slice(0, 50));
-        }
-        break;
-
-      case 'bot:status':
-        if (!botId || message.botId === botId) {
-          setBotStatus(message.status);
-        }
-        break;
-
-      case 'connected':
-        console.log('[useMarketData] Server acknowledged connection');
-        break;
-
-      case 'subscribed':
-        console.log('[useMarketData] Subscribed to:', message.key);
-        break;
-
-      case 'error':
-        console.error('[useMarketData] Server error:', message.message);
-        break;
-    }
-  }, [symbol, timeframe, botId]);
-
-  // Disconnect
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-  }, []);
-
-  // Change subscription
-  const changeSubscription = useCallback((newSymbol: string, newTimeframe: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      // Unsubscribe from old
-      wsRef.current.send(JSON.stringify({
-        type: 'unsubscribe',
-        channel: 'candles',
-        symbol,
-        timeframe,
-      }));
-
-      // Subscribe to new
-      wsRef.current.send(JSON.stringify({
-        type: 'subscribe',
-        channel: 'candles',
-        symbol: newSymbol,
-        timeframe: newTimeframe,
-      }));
+      }
+    } catch (error) {
+      console.error('[useMarketData] Failed to refetch:', error);
     }
   }, [symbol, timeframe]);
 
-  // Auto-connect on mount
-  useEffect(() => {
-    if (autoConnect) {
-      fetchInitialCandles();
-      connect();
-    }
-
-    return () => {
-      disconnect();
-    };
-  }, [autoConnect, fetchInitialCandles, connect, disconnect]);
-
-  // Refetch when symbol/timeframe changes
-  useEffect(() => {
-    fetchInitialCandles();
-    changeSubscription(symbol, timeframe);
-  }, [symbol, timeframe, fetchInitialCandles, changeSubscription]);
+  // Only return candles if they match the current symbol
+  const validCandles = state.dataSymbol === symbol && state.dataTimeframe === timeframe 
+    ? state.candles 
+    : [];
+  const validTicker = state.dataSymbol === symbol ? state.ticker : null;
+  const validCurrentCandle = state.dataSymbol === symbol && state.dataTimeframe === timeframe 
+    ? state.currentCandle 
+    : null;
 
   return {
     // Connection
-    status,
-    connect,
-    disconnect,
+    status: state.status,
+    connect: () => {},
+    disconnect: () => {},
 
-    // Market data
-    candles,
-    currentCandle,
-    ticker,
+    // Market data - only return if matches current symbol
+    candles: validCandles,
+    currentCandle: validCurrentCandle,
+    ticker: validTicker,
 
     // Bot data
     decision,
@@ -343,8 +263,8 @@ export function useMarketData(options: UseMarketDataOptions) {
     botStatus,
 
     // Actions
-    refetch: fetchInitialCandles,
-    changeSubscription,
+    refetch,
+    changeSubscription: () => {},
   };
 }
 

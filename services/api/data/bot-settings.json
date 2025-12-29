@@ -1,0 +1,21 @@
+{
+  "0x0d27fff95a80b55f47e06700c46c0b79ded7a32d": {
+    "botName": "Whalez Bot",
+    "tradingMode": "aggressive",
+    "dynamicLeverage": true,
+    "maxLeverage": 50,
+    "minConfirmations": 3,
+    "userPrompt": "",
+    "tradingBag": [
+      "BTC-PERP",
+      "MEGA-PERP",
+      "HYPE-PERP",
+      "SOL-PERP",
+      "TAO-PERP"
+    ],
+    "positionSizePct": 2,
+    "stopLossPct": 10,
+    "takeProfitPct": 50,
+    "maxSimultaneousPositions": 3
+  }
+}

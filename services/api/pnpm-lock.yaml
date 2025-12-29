@@ -1,0 +1,62 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@whalez/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@whalez/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+
+  ../..: {}
+
+  ../../..: {}
+
+  ../../../siteweb/pro-main/pro-main: {}
+
+  ../../../siteweb/r3f-scroll-rig-master/r3f-scroll-rig-master: {}
+
+  ../../../siteweb/r3f-scroll-rig-master/r3f-scroll-rig-master/powerups: {}
+
+  ../../../siteweb/r3f-scroll-rig-master/r3f-scroll-rig-master/scrollbar: {}
+
+  ../../../siteweb/react-three-fiber-master/react-three-fiber-master: {}
+
+  ../../../siteweb/react-three-fiber-master/react-three-fiber-master/example: {}
+
+  ../../../siteweb/react-three-fiber-master/react-three-fiber-master/packages/eslint-plugin: {}
+
+  ../../../siteweb/react-three-fiber-master/react-three-fiber-master/packages/fiber: {}
+
+  ../../../siteweb/react-three-fiber-master/react-three-fiber-master/packages/fiber/native: {}
+
+  ../../../siteweb/react-three-fiber-master/react-three-fiber-master/packages/test-renderer: {}
+
+  ../../../siteweb/uilayouts-main/uilayouts-main: {}
+
+  ../../../siteweb/uilayouts-main/uilayouts-main/apps/ui-layout: {}
+
+  ../../../siteweb/uilayouts-main/uilayouts-main/apps/ui-layout/cli: {}
+
+  ../../../siteweb/uilayouts-main/uilayouts-main/packages/blocks: {}
+
+  ../../../siteweb/uilayouts-main/uilayouts-main/packages/eslint-config: {}
+
+  ../../../siteweb/uilayouts-main/uilayouts-main/packages/typescript-config: {}
+
+  ../../../siteweb/uilayouts-main/uilayouts-main/packages/ui: {}
+
+  ../../apps/web: {}
+
+  ../../packages/core: {}
+
+  ../../packages/database: {}
+
+  ../worker: {}

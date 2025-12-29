@@ -51,15 +51,15 @@ export const marketRoutes: FastifyPluginAsync = async (fastify) => {
         required: ['symbol', 'timeframe'],
         properties: {
           symbol: { type: 'string' },
-          timeframe: { type: 'string', enum: ['1m', '5m', '15m', '1h', '4h', '1d'] },
-          limit: { type: 'integer', minimum: 1, maximum: 1000, default: 500 },
+          timeframe: { type: 'string', enum: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '8h', '12h', '1d', '3d', '1w', '1M'] },
+          limit: { type: 'integer', minimum: 1, maximum: 5000, default: 500 },
         },
       },
     },
   }, async (request) => {
     const { symbol, timeframe, limit } = request.query as {
       symbol: string;
-      timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+      timeframe: '1m' | '3m' | '5m' | '15m' | '30m' | '1h' | '2h' | '4h' | '8h' | '12h' | '1d' | '3d' | '1w' | '1M';
       limit?: number;
     };
 
@@ -202,6 +202,165 @@ export const marketRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * GET /market/full-context
+   * Get comprehensive market data for a symbol (funding, OI, orderbook, etc.)
+   */
+  fastify.get('/full-context', {
+    schema: {
+      querystring: {
+        type: 'object',
+        required: ['symbol'],
+        properties: {
+          symbol: { type: 'string' },
+        },
+      },
+    },
+  }, async (request) => {
+    const { symbol } = request.query as { symbol: string };
+    const coin = symbol.replace('-PERP', '');
+
+    try {
+      // Fetch meta and asset contexts from Hyperliquid
+      const response = await fetch('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
+      });
+      const data = await response.json() as any;
+      
+      const meta = data[0]?.universe || [];
+      const ctxs = data[1] || [];
+      
+      // Find the coin index
+      const coinIndex = meta.findIndex((m: any) => m.name === coin);
+      const coinMeta = meta[coinIndex];
+      const coinCtx = ctxs[coinIndex];
+      
+      if (!coinMeta || !coinCtx) {
+        return { success: false, error: 'Symbol not found' };
+      }
+
+      // Calculate funding APY
+      const fundingRate = parseFloat(coinCtx.funding || '0');
+      const fundingAPY = fundingRate * 24 * 365 * 100;
+
+      // Fetch orderbook
+      const orderbookRes = await fetch('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'l2Book', coin }),
+      });
+      const orderbookData = await orderbookRes.json() as any;
+      
+      const bids = (orderbookData.levels?.[0] || []).slice(0, 10).map((l: any) => ({
+        price: parseFloat(l.px),
+        size: parseFloat(l.sz),
+        total: parseFloat(l.px) * parseFloat(l.sz),
+      }));
+      const asks = (orderbookData.levels?.[1] || []).slice(0, 10).map((l: any) => ({
+        price: parseFloat(l.px),
+        size: parseFloat(l.sz),
+        total: parseFloat(l.px) * parseFloat(l.sz),
+      }));
+
+      const bestBid = bids[0]?.price || 0;
+      const bestAsk = asks[0]?.price || 0;
+      const midPrice = (bestBid + bestAsk) / 2;
+      const spread = bestAsk - bestBid;
+      const spreadPct = midPrice > 0 ? (spread / midPrice) * 100 : 0;
+
+      // Calculate orderbook imbalance (top 5 levels)
+      const bidVolume = bids.slice(0, 5).reduce((s: number, b: any) => s + b.size, 0);
+      const askVolume = asks.slice(0, 5).reduce((s: number, a: any) => s + a.size, 0);
+      const imbalance = (bidVolume + askVolume) > 0 ? bidVolume / (bidVolume + askVolume) : 0.5;
+
+      return {
+        success: true,
+        symbol,
+        coin,
+        price: {
+          mid: midPrice,
+          bid: bestBid,
+          ask: bestAsk,
+          mark: parseFloat(coinCtx.markPx || '0'),
+          index: parseFloat(coinCtx.oraclePx || '0'),
+        },
+        funding: {
+          rate: fundingRate,
+          ratePercent: fundingRate * 100,
+          apy: fundingAPY,
+          premium: parseFloat(coinCtx.premium || '0'),
+          nextFunding: '1 hour',
+        },
+        openInterest: {
+          value: parseFloat(coinCtx.openInterest || '0'),
+          valueUsd: parseFloat(coinCtx.openInterest || '0') * midPrice,
+        },
+        volume24h: parseFloat(coinCtx.dayNtlVlm || '0'),
+        orderbook: {
+          bids: bids.slice(0, 5),
+          asks: asks.slice(0, 5),
+          spread,
+          spreadPct,
+          imbalance,
+          imbalanceLabel: imbalance > 0.6 ? 'Bullish' : imbalance < 0.4 ? 'Bearish' : 'Neutral',
+        },
+        marketInfo: {
+          maxLeverage: coinMeta.maxLeverage || 50,
+          tickSize: parseFloat(coinMeta.tickSize || '0.1'),
+          stepSize: Math.pow(10, -(coinMeta.szDecimals || 5)),
+          minOrderSize: Math.pow(10, -(coinMeta.szDecimals || 5)),
+          marginType: 'USD',
+        },
+        timestamp: Date.now(),
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * GET /market/all-funding
+   * Get funding rates for all symbols
+   */
+  fastify.get('/all-funding', async () => {
+    try {
+      const response = await fetch('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
+      });
+      const data = await response.json() as any;
+      
+      const meta = data[0]?.universe || [];
+      const ctxs = data[1] || [];
+      
+      const fundingRates = meta.map((m: any, i: number) => {
+        const ctx = ctxs[i] || {};
+        const fundingRate = parseFloat(ctx.funding || '0');
+        return {
+          symbol: m.name,
+          fundingRate,
+          fundingRatePercent: fundingRate * 100,
+          fundingAPY: fundingRate * 24 * 365 * 100,
+          openInterest: parseFloat(ctx.openInterest || '0'),
+          markPrice: parseFloat(ctx.markPx || '0'),
+          volume24h: parseFloat(ctx.dayNtlVlm || '0'),
+        };
+      }).sort((a: any, b: any) => Math.abs(b.fundingAPY) - Math.abs(a.fundingAPY));
+
+      return {
+        success: true,
+        count: fundingRates.length,
+        data: fundingRates,
+        timestamp: Date.now(),
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
    * POST /market/stream/start
    * Start streaming candles to WebSocket (internal use)
    */
@@ -212,14 +371,14 @@ export const marketRoutes: FastifyPluginAsync = async (fastify) => {
         required: ['symbol', 'timeframe'],
         properties: {
           symbol: { type: 'string' },
-          timeframe: { type: 'string', enum: ['1m', '5m', '15m', '1h', '4h', '1d'] },
+          timeframe: { type: 'string', enum: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '8h', '12h', '1d', '3d', '1w', '1M'] },
         },
       },
     },
   }, async (request) => {
     const { symbol, timeframe } = request.body as {
       symbol: string;
-      timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+      timeframe: '1m' | '3m' | '5m' | '15m' | '30m' | '1h' | '2h' | '4h' | '8h' | '12h' | '1d' | '3d' | '1w' | '1M';
     };
 
     const key = `${symbol}:${timeframe}`;

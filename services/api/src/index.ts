@@ -1,3 +1,9 @@
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env from root directory
+config({ path: resolve(process.cwd(), '../../.env') });
+
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
@@ -13,6 +19,11 @@ import { marketRoutes } from './routes/market.js';
 import { debugRoutes } from './routes/debug.js';
 import { tradingRoutes } from './routes/trading.js';
 import { decisionsRoutes } from './routes/decisions.js';
+import { aiRoutes } from './routes/ai-routes.js';
+import { statsRoutes } from './routes/stats.js';
+import { accountRoutes } from './routes/account.js';
+import { backtestRoutes } from './routes/backtest.js';
+import { grokRoutes } from './routes/grok.js';
 
 const PORT = Number(process.env['API_PORT']) || 3001;
 const HOST = process.env['API_HOST'] || '0.0.0.0';
@@ -26,7 +37,7 @@ async function main() {
 
   // Register plugins
   await fastify.register(cors, {
-    origin: process.env['CORS_ORIGIN'] || '*',
+    origin: true, // Allow all origins in development
     credentials: true,
   });
 
@@ -35,7 +46,7 @@ async function main() {
   });
 
   await fastify.register(rateLimit, {
-    max: 100,
+    max: 500,
     timeWindow: '1 minute',
   });
 
@@ -71,9 +82,14 @@ async function main() {
   await fastify.register(critiqueRoutes, { prefix: '/api/critique' });
   await fastify.register(marketRoutes, { prefix: '/api/market' });
   await fastify.register(decisionsRoutes, { prefix: '/api/decisions' });
+  await fastify.register(aiRoutes, { prefix: '/api/ai' });
+  await fastify.register(statsRoutes, { prefix: '/api/stats' });
+  await fastify.register(accountRoutes, { prefix: '/api/account' });
   await fastify.register(debugRoutes, { prefix: '/debug' });
   await fastify.register(tradingRoutes, { prefix: '/trading' });
   await fastify.register(wsRoutes, { prefix: '/ws' });
+  await fastify.register(backtestRoutes, { prefix: '/api/backtest' });
+  await fastify.register(grokRoutes, { prefix: '/api/grok' });
 
   // Start server
   try {

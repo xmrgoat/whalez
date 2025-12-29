@@ -5,25 +5,28 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@whalez/core": "workspace:*",
-    "@whalez/database": "workspace:*",
-    "fastify": "^4.24.0",
     "@fastify/cors": "^8.4.0",
     "@fastify/jwt": "^7.2.0",
-    "@fastify/websocket": "^8.2.0",
     "@fastify/rate-limit": "^9.0.0",
+    "@fastify/websocket": "^8.2.0",
+    "@whalez/core": "workspace:*",
+    "@whalez/database": "workspace:*",
     "bcryptjs": "^2.4.3",
+    "dotenv": "^17.2.3",
+    "fastify": "^4.24.0",
+    "pg": "^8.16.3",
     "zod": "^3.22.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.10.0",
+    "@types/pg": "^8.16.0",
     "tsx": "^4.6.0",
     "typescript": "^5.3.0"
   }

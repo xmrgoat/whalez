@@ -10,12 +10,16 @@ import {
   PaperMarketDataAdapter,
   HyperliquidExecutionAdapter,
   HyperliquidMarketDataAdapter,
+  EnhancedGrokService,
+  RealtimeDataService,
+  getRealtimeDataService,
   type BotConfig,
   type OHLC,
   type Signal,
   type Trade,
   type MarketDataAdapter,
   type ExecutionAdapter,
+  type MarketContext,
 } from '@whalez/core';
 
 const CRITIQUE_INTERVAL = 5; // Every 5 closed trades
@@ -34,10 +38,12 @@ export class BotRunner {
 
   private marketDataAdapter: MarketDataAdapter;
   private executionAdapter: ExecutionAdapter;
+  private realtimeDataService: RealtimeDataService | null = null;
 
   private unsubscribes: Array<() => void> = [];
   private closedTradeCount = 0;
   private lastCritiqueAt = 0;
+  private lastMarketContext: MarketContext | null = null;
 
   constructor(bot: Bot) {
     this.bot = bot;
@@ -81,6 +87,17 @@ export class BotRunner {
     // Connect adapters
     await this.marketDataAdapter.connect();
     await this.executionAdapter.connect();
+
+    // Initialize realtime data service for orderbook, liquidations, funding
+    try {
+      this.realtimeDataService = getRealtimeDataService();
+      await this.realtimeDataService.connect();
+      this.realtimeDataService.subscribeToL2Book(this.config.symbol);
+      this.realtimeDataService.subscribeTrades(this.config.symbol);
+      console.log(`[BotRunner] Connected to realtime data for ${this.config.symbol}`);
+    } catch (e) {
+      console.warn(`[BotRunner] Realtime data service unavailable:`, e);
+    }
 
     this.running = true;
 
@@ -165,10 +182,96 @@ export class BotRunner {
         return; // Not enough data
       }
 
-      // Process through strategy engine
+      // Process through strategy engine (technical analysis)
       const signal = this.strategyEngine.processCandles(candles, timeframe as any);
 
-      if (signal) {
+      // Get realtime market context (orderbook, funding, liquidations, market info)
+      let marketSignals = { fundingBias: 0, orderbookBias: 0, liquidationBias: 0, volumeBias: 0 };
+      if (this.realtimeDataService) {
+        const fullData = await this.realtimeDataService.getFullMarketData(this.config.symbol);
+        this.lastMarketContext = fullData.context;
+        
+        // Log market data
+        if (this.lastMarketContext?.orderBook) {
+          console.log(`[BotRunner] Orderbook: spread=${this.lastMarketContext.orderBook.spreadPct.toFixed(4)}%, imbalance=${(this.lastMarketContext.orderBook.imbalance * 100).toFixed(1)}%`);
+        }
+        if (this.lastMarketContext?.funding) {
+          const fundingAPY = fullData.fundingAPY;
+          console.log(`[BotRunner] Funding: ${(this.lastMarketContext.funding.fundingRate * 100).toFixed(4)}% (APY: ${fundingAPY.toFixed(2)}%)`);
+        }
+        if (this.lastMarketContext?.marketInfo) {
+          console.log(`[BotRunner] Market: maxLev=${this.lastMarketContext.marketInfo.maxLeverage}x, tick=${this.lastMarketContext.marketInfo.tickSize}`);
+        }
+        console.log(`[BotRunner] Volume: ${fullData.volumeTrend}, Liquidations: ${fullData.recentLiquidationPressure}`);
+        
+        // Calculate market biases for signal enhancement
+        // Funding bias: positive funding = longs pay shorts (bearish), negative = bullish
+        marketSignals.fundingBias = fullData.fundingAPY > 20 ? -1 : fullData.fundingAPY < -20 ? 1 : 0;
+        
+        // Orderbook bias: imbalance > 0.6 = bullish, < 0.4 = bearish
+        marketSignals.orderbookBias = fullData.orderBookImbalance > 0.6 ? 1 : fullData.orderBookImbalance < 0.4 ? -1 : 0;
+        
+        // Liquidation bias: long liquidations = bearish pressure, short = bullish
+        marketSignals.liquidationBias = fullData.recentLiquidationPressure === 'long' ? -1 : fullData.recentLiquidationPressure === 'short' ? 1 : 0;
+        
+        // Volume bias
+        marketSignals.volumeBias = fullData.volumeTrend === 'bullish' ? 1 : fullData.volumeTrend === 'bearish' ? -1 : 0;
+      }
+
+      // Use Grok AI for enhanced analysis
+      const grok = EnhancedGrokService.getInstance();
+      if (grok.isAvailable()) {
+        const lastCandle = candles[candles.length - 1]!;
+        const prevCandle = candles[candles.length - 2];
+        const change24h = prevCandle ? ((lastCandle.close - prevCandle.close) / prevCandle.close) * 100 : 0;
+        
+        const grokAnalysis = await grok.analyzeMarket({
+          symbol: this.config.symbol,
+          price: lastCandle.close,
+          change24h,
+          indicators: signal?.indicators || {},
+          volume: lastCandle.volume,
+          guardrails: {
+            maxLeverage: this.config.risk.maxLeverage,
+            maxPositionPct: this.config.risk.maxPositionSizePercent,
+            maxDrawdown: this.config.risk.maxDrawdownPercent,
+          },
+        });
+
+        console.log(`[BotRunner] Grok Analysis: ${grokAnalysis.action} (confidence: ${grokAnalysis.confidence}%)`);
+        console.log(`[BotRunner] Grok Reasoning: ${grokAnalysis.reasoning}`);
+
+        // Save Grok decision to database
+        await this.saveGrokDecision(grokAnalysis, lastCandle);
+
+        // Only proceed if Grok agrees with the signal or has high confidence
+        if (grokAnalysis.action === 'HOLD' || grokAnalysis.action === 'NO_TRADE') {
+          console.log(`[BotRunner] Grok says HOLD/NO_TRADE - skipping signal`);
+          return;
+        }
+
+        // Map Grok action to signal action
+        if (signal && grokAnalysis.confidence >= 60) {
+          // Grok confirms the signal
+          await this.handleSignal(signal, candles);
+        } else if (grokAnalysis.confidence >= 75) {
+          // Grok has high confidence even without technical signal
+          const grokSignal: Signal = {
+            id: `grok_${Date.now()}`,
+            botId: this.config.id,
+            symbol: this.config.symbol,
+            timeframe: timeframe as any,
+            action: grokAnalysis.action === 'LONG' ? 'long' : 'short',
+            confidence: grokAnalysis.confidence,
+            price: lastCandle.close,
+            indicators: signal?.indicators || {},
+            reasons: [grokAnalysis.reasoning],
+            timestamp: Date.now(),
+          };
+          await this.handleSignal(grokSignal, candles);
+        }
+      } else if (signal) {
+        // Grok not available, use technical signal only
         await this.handleSignal(signal, candles);
       }
 
@@ -411,5 +514,11 @@ export class BotRunner {
         applied: change.applied,
       },
     });
+  }
+
+  private async saveGrokDecision(analysis: any, candle: OHLC): Promise<void> {
+    // Log the decision - database save is optional
+    console.log(`[BotRunner] Grok Decision: ${analysis.action} @ $${candle.close} (${analysis.confidence}%)`);
+    console.log(`[BotRunner] Reasoning: ${analysis.reasoning?.substring(0, 200)}...`);
   }
 }

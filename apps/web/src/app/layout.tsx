@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Press_Start_2P, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import { Providers } from './providers';
 
-const pixelFont = Press_Start_2P({
-  weight: '400',
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-pixel',
+  variable: '--font-display',
 });
 
 const monoFont = JetBrains_Mono({
@@ -14,8 +14,8 @@ const monoFont = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Whalez',
-  description: 'Autonomous Trading Agent with Self-Critique',
+  title: 'Whalez - Autonomous Trading',
+  description: 'AI-powered trading bot on Hyperliquid with self-critique and adaptive learning',
 };
 
 export default function RootLayout({
@@ -24,9 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${pixelFont.variable} ${monoFont.variable} font-mono bg-white text-black antialiased`}>
-        {children}
+    <html lang="en" className="dark">
+      <body className={`${inter.variable} ${monoFont.variable} font-mono antialiased`}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
